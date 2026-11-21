@@ -2,12 +2,17 @@ import { admin } from "../../lib/supabase";
 
 export const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 
-/** Same phone number, ignoring the country code and punctuation. Compares the last 10 digits. */
+/** A full international number as digits: the country code and the number, 11 to 15 digits (E.164 allows up to 15).
+ *  A number without its country code is refused: it could match a number in another country. */
+export function normalizeNumber(s: string | null | undefined): string | null {
+  const d = digits(s);
+  return d.length >= 11 && d.length <= 15 ? d : null;
+}
+
+/** Same phone number. Both must be full international numbers, and every digit must match. No suffix matching. */
 export function sameNumber(a: string | null | undefined, b: string | null | undefined): boolean {
-  const x = digits(a), y = digits(b);
-  if (x.length < 8 || y.length < 8) return false;
-  const n = Math.min(10, x.length, y.length);
-  return x.slice(-n) === y.slice(-n);
+  const x = normalizeNumber(a), y = normalizeNumber(b);
+  return !!x && !!y && x === y;
 }
 
 export interface KnownNumber { number: string; who: "person" | "vendor" | "env"; personId?: string; projectId?: string | null; vendorId?: string }
@@ -20,9 +25,13 @@ export async function knownNumbers(): Promise<KnownNumber[]> {
     db.from("vendor_contacts").select("vendor_id, phone").not("phone", "is", null),
   ]);
   const out: KnownNumber[] = [];
-  for (const p of ppl ?? []) if (digits(p.phone)) out.push({ number: digits(p.phone), who: "person", personId: p.id, projectId: p.project_id });
-  for (const v of vcs ?? []) if (digits(v.phone)) out.push({ number: digits(v.phone), who: "vendor", vendorId: v.vendor_id });
-  for (const n of (process.env.WHATSAPP_ALLOW_NUMBERS ?? "").split(",")) if (digits(n)) out.push({ number: digits(n), who: "env" });
+  const bad: string[] = [];
+  const take = (raw: string | null | undefined, k: Omit<KnownNumber, "number">) => { const n = normalizeNumber(raw); if (n) out.push({ number: n, ...k }); else if (digits(raw)) bad.push(String(raw)); };
+  for (const p of ppl ?? []) take(p.phone, { who: "person", personId: p.id, projectId: p.project_id });
+  for (const v of vcs ?? []) take(v.phone, { who: "vendor", vendorId: v.vendor_id });
+  for (const n of (process.env.WHATSAPP_ALLOW_NUMBERS ?? "").split(",")) take(n, { who: "env" });
+  // An entry without a country code never matches. Say so, so the mistake is easy to find.
+  if (bad.length) console.warn(`[whatsapp] ${bad.length} allow-list entr${bad.length > 1 ? "ies" : "y"} ignored: a number needs its country code (11 to 15 digits).`);
   return out;
 }
 
