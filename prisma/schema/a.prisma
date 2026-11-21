@@ -5,7 +5,7 @@ model allowed_users {
   is_demo Boolean?   @default(true)
 }
 
-// id equals auth.users.id (FK to the auth schema is created by the trigger, not modelled here)
+// id equals auth.users.id (FK to auth.users with ON DELETE CASCADE is added in the hand-written migration)
 model profiles {
   id         String      @id @db.Uuid
   email      String      @unique

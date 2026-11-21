@@ -7,6 +7,11 @@ ALTER TABLE actions ADD CONSTRAINT actions_status_chk CHECK (status IN ('propose
 ALTER TABLE quote_terms ADD CONSTRAINT quote_terms_status_chk CHECK (status IN ('met','not_met','not_stated'));
 ALTER TABLE decisions ADD CONSTRAINT decisions_override_reason_chk CHECK (NOT COALESCE(overridden,false) OR reason IS NOT NULL);
 
+-- FKs into Supabase's auth schema (Prisma cannot model them). Deleting a user removes their profile
+-- and their stored Google refresh token.
+ALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE mail_tokens ADD CONSTRAINT mail_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
 -- Indexes on types Prisma cannot model
 CREATE INDEX item_codes_embedding ON item_codes USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX item_codes_trgm ON item_codes USING gin (description gin_trgm_ops);
