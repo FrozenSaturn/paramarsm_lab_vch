@@ -20,6 +20,7 @@ const WF = "Remember message";
 
 export interface MessageRow {
   id: string;
+  channel?: string | null;
   case_id: string | null;
   sender: string | null;
   subject: string | null;
@@ -29,7 +30,7 @@ export interface MessageRow {
 }
 
 export async function loadMessage(messageId: string): Promise<MessageRow | null> {
-  const { data } = await admin().from("messages").select("id,case_id,sender,subject,body,body_en,direction").eq("id", messageId).maybeSingle();
+  const { data } = await admin().from("messages").select("id,case_id,channel,sender,subject,body,body_en,direction").eq("id", messageId).maybeSingle();
   return (data as MessageRow) ?? null;
 }
 
@@ -61,7 +62,10 @@ export async function rememberMessage(input: EventMap["message.stored"]) {
   const m = await loadMessage(input.message_id);
   if (!m) return { skipped: "message not found" };
   const caseId = input.case_id ?? m.case_id ?? null;
-  if (!senderAllowed(m.sender, parseAllowlist(process.env.MEM0_SENDER_ALLOWLIST))) {
+  // A "From" header can be forged, so email senders are not trusted by default. WhatsApp sender ids come from the
+  // WhatsApp network. Set MEM0_ALLOW_EMAIL=true only for a demo mailbox that only the builders write to.
+  const emailTrusted = process.env.MEM0_ALLOW_EMAIL === "true";
+  if ((m.channel === "email" && !emailTrusted) || !senderAllowed(m.sender, parseAllowlist(process.env.MEM0_SENDER_ALLOWLIST))) {
     await logStep({ caseId: caseId ?? undefined, workflow: WF, step: "allow-list", status: "skipped",
       input: { message_id: m.id }, output: { skipped: "sender not on allow-list" } }).catch(() => undefined);
     return { skipped: "sender not on allow-list" };

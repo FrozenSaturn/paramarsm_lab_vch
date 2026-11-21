@@ -5,6 +5,7 @@
  * - A page without a text layer (a scan) falls back to the quote reading in quotes.extraction.
  * - A run that finds the same chunks as before does nothing ("unchanged"), unless `force` is set.
  */
+import { emailKey } from "@/memory/entities";
 import { admin } from "@/lib/supabase";
 import { embed, toPgVector } from "@/lib/embeddings";
 import { logStep } from "@/lib/steps";
@@ -229,16 +230,17 @@ export async function indexDocument(documentId: string, opts: { force?: boolean 
 /** The email address in a sender such as `Name <a@b.c>`, in lower case, or the sender digits for a phone number. */
 export function senderKey(sender: string | null | undefined): { email: string | null; phone: string | null } {
   const s = (sender ?? "").trim();
-  const email = s.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)?.[0]?.toLowerCase() ?? null;
+  // emailKey reads the address inside <...>, so "Name a@b.c <x@y.z>" resolves to x@y.z, the real sender.
+  const email = emailKey(s);
   const digits = email ? null : s.replace(/\D/g, "");
-  return { email, phone: digits && digits.length >= 8 ? digits : null };
+  return { email, phone: digits && digits.length >= 10 ? digits : null };
 }
 
 async function vendorForSender(sender: string | null): Promise<string | null> {
   const { email, phone } = senderKey(sender);
   const db = admin();
   if (email) {
-    const { data } = await db.from("vendor_contacts").select("vendor_id").ilike("email", email).limit(1);
+    const { data } = await db.from("vendor_contacts").select("vendor_id").ilike("email", email.replace(/[\\%_]/g, (c) => "\\" + c)).limit(1); // escaped: % and _ match only themselves
     if (data?.[0]) return data[0].vendor_id;
   }
   if (phone) {
