@@ -28,7 +28,7 @@ The MVP shows one work package (waterproofing, Amara Tower-2) travelling the who
 | --- | --- |
 | Contracts engineer (main user) and admin | Builder 1, signed in with their Google account. This mailbox is "Vinayak contracts" |
 | HOD | Builder 2, signed in with their Google account |
-| Every vendor | Builder 2's Gmail using plus-addresses (`name+bajrang@gmail.com`, `name+shyama@gmail.com`). All vendor mail lands in one inbox we own, which is also how the "never email a real vendor" rule is kept |
+| Every vendor | Builder 2's Gmail using plus-addresses (`name+bajrang@gmail.com`, `name+shyama@gmail.com`). All vendor mail lands in one inbox we own |
 | Site engineer | Either builder's phone, allow-listed, messaging the linked WhatsApp number |
 
 ### Left out of the MVP
@@ -50,11 +50,10 @@ Their SOP has 12 steps (`vinayak-vch3-data/01_process`). This plan covers them a
 | 8 Management approval | Email chain | Recommendation packet with reasons and proof; HOD approves, edits or sends back |
 | 9–12 Registration, work order, approval, floating | Manual | Later phase; same draft-approve-send machinery |
 
-Three rules from the problem statement are built in as hard constraints, not conventions:
+Two rules from the problem statement are built in as hard constraints, not conventions:
 
 - The agent recommends. It never selects, orders or pays.
 - Every ranking shows its reason in plain words, with a link to the evidence.
-- Outbound messages go to test inboxes only until the client turns that off (section 9).
 
 ## 2. Design decisions
 
@@ -305,7 +304,7 @@ Together these answer "what was done, when, by whom, where and why" for any case
 | HOD | See everything; approve, send back or override a recommendation; change scoring weights | Approval screen and read access |
 | Site engineer | See own project's cases; submit requirements; answer clarifications | Read-only; they interact through WhatsApp |
 | Management | Read everything; final approval above a value limit | Read-only |
-| Admin | Users and roles, mailbox and WhatsApp connection, sandbox switch | Settings page |
+| Admin | Users and roles, mailbox and WhatsApp connection | Settings page |
 
 ### How it is enforced
 
@@ -317,7 +316,6 @@ Together these answer "what was done, when, by whom, where and why" for any case
 
 ### Safety switches
 
-- `OUTBOUND_MODE=sandbox` is enforced inside the executor: mail can only go to addresses on the demo list (the plus-addresses), and a banner shows on every page.
 - WhatsApp processes allow-listed senders only.
 - Google refresh tokens and the Evolution key are stored server-side and never sent to the browser. The client's documents are confidential; nothing is used outside this build.
 
@@ -330,7 +328,7 @@ Together these answer "what was done, when, by whom, where and why" for any case
 5. **Vendors.** Profile, scorecard, every past RFQ, quote and response time, and the "What we remember" panel.
 6. **Item codes.** The ERP mirror and the hygiene report.
 7. **Audit.** The full log, filterable by case, person, agent and action type.
-8. **Settings.** Mailboxes, WhatsApp pairing, weights, approval policies, sandbox switch.
+8. **Settings.** Mailboxes, WhatsApp pairing, weights, approval policies.
 
 ## 11. Farvision (minimal)
 

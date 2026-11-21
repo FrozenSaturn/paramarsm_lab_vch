@@ -30,7 +30,7 @@ You own everything from "a message arrives" to "RFQs are sent and being chased",
 | `src/app/` shell: `layout`, `login`, `inbox`, `cases`, `cases/[id]`, `settings`, `api/auth`, `api/actions`, `api/webhooks`, `api/inngest` | App shell, case workspace frame, settings |
 | `src/components/case/a/` | Case panels that are yours (below) |
 | `src/channels/` | `gmail/`, `whatsapp/`, `ChannelAdapter` and `MailAdapter` |
-| `src/executor/` | `proposeAction`, `approveAction`, `rejectAction`, handler registry, sandbox check, receipts |
+| `src/executor/` | `proposeAction`, `approveAction`, `rejectAction`, handler registry, receipts |
 | `src/workflows/a/`, `src/agents/a/` | W0 to W4 and their prompts |
 | `src/llm/` | The existing model interface (`sarvam.ts`, `claude.ts`). B uses it and does not edit it. Ask for changes |
 | `src/lib/` | `supabase`, `auth`, `rbac`, `storage`, `steps` (agent step logger), `embeddings` |
@@ -50,7 +50,7 @@ You own everything from "a message arrives" to "RFQs are sent and being chased",
 
 ### Screens
 
-Inbox, Cases board, the Case workspace frame (three columns, tab registry, live activity panel), Settings (mailbox, WhatsApp pairing, sandbox switch, "view as"), Item codes page, and the case panels *Conversation*, *BOQ*, *Codes*, *RFQ drafts* (the editor for RFQs and clarifications).
+Inbox, Cases board, the Case workspace frame (three columns, tab registry, live activity panel), Settings (mailbox, WhatsApp pairing, "view as"), Item codes page, and the case panels *Conversation*, *BOQ*, *Codes*, *RFQ drafts* (the editor for RFQs and clarifications).
 
 ### Action kinds you register
 
@@ -70,8 +70,8 @@ Each stage ends with something you can show on your own.
 
 **Stage 2: sending mail**
 - Gmail OAuth with offline access, refresh-token storage, `drafts.create`, `drafts.send`.
-- Executor handlers for `send_email`, with the sandbox allow-list enforced inside the executor.
-- **Test alone:** create a draft in the app, edit it, approve it and see it in your Gmail Sent folder and as a receipt. A non-allow-listed address is refused.
+- Executor handlers for `send_email`.
+- **Test alone:** create a draft in the app, edit it, approve it and see it in your Gmail Sent folder and as a receipt. 
 
 **Stage 3: receiving mail**
 - Gmail poller (60 s, `historyId`, de-dupe on message id), quoted-chain splitting, thread and `[VIN-RFQ-####]` token matching.
@@ -90,7 +90,7 @@ Each stage ends with something you can show on your own.
 - **Test alone:** from an accepted BOQ, four RFQs go out to B's plus-addresses and receipts show. Replies are B's inbox, so also check one by eye.
 
 **Stage 6: finish**
-- ERP import sheet export, "view as" switch, sandbox banner, polish the case frame, Settings page.
+- ERP import sheet export, "view as" switch, polish the case frame, Settings page.
 - Together: the end-to-end rehearsals (section 6).
 
 If time runs short, cut in this order: WhatsApp voice (use `/dev/upload`), W4 reminder, ERP sheet. Do not cut the executor or Gmail send.
@@ -126,7 +126,7 @@ Read quote PDFs, compute a comparative, score, write `quotes*`, `scores`, `recom
 
 - The demo script steps 1, 2 and 3 run on real channels, and step 4's mail reaches B's inbox and is classified correctly.
 - Every send has a receipt with payload hash, approver and provider id.
-- Anyone not on `allowed_users` sees nothing. A site-engineer login cannot approve. The executor refuses a non-allow-listed recipient in sandbox mode.
+- Anyone not on `allowed_users` sees nothing. A site-engineer login cannot approve.
 - Two joint rehearsals of the full script (PLAN.md section 13) are done with B.
 
 ## 7. Day 0 (30 to 60 minutes, together, before splitting)
