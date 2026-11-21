@@ -6,6 +6,7 @@ import { admin } from "@/lib/supabase";
 import { publish } from "@/workflows/b/publish";
 import { runQuoteIntake } from "@/quotes/intake";
 import { QuotesTable } from "@/components/case/b/QuotesTable";
+import { ComparativePanel } from "@/components/case/b/ComparativePanel";
 import { s } from "@/components/case/b/ui";
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,10 @@ async function startIntake(form: FormData) {
   redirect(`/dev/quotes?case=${input.case_id}`);
 }
 
-export default async function DevQuotes({ searchParams }: { searchParams: Promise<{ case?: string }> }) {
+export default async function DevQuotes({ searchParams }: { searchParams: Promise<{ case?: string; cv?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
   await requirePageUser();
-  const { case: caseParam } = await searchParams;
+  const { case: caseParam, cv } = await searchParams;
   const db = admin();
   const { data: cases } = await db.from("cases").select("id,title").order("created_at", { ascending: false }).limit(20);
   const caseId = caseParam ?? cases?.[0]?.id;
@@ -41,7 +42,7 @@ export default async function DevQuotes({ searchParams }: { searchParams: Promis
     : [{ data: [] }, { data: [] }, { data: [] }];
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ maxWidth: 1400 }}>
       <h1>Dev: quotes</h1>
       <p style={s.muted}>
         Starts W5 on a PDF already in Storage, without any channel. Reader: {process.env.QUOTE_READER === "fixture" ? "hand-checked fixtures (no model call)" : `Claude (${process.env.QUOTE_MODEL || "claude-opus-5-5"})`}.
@@ -71,6 +72,7 @@ export default async function DevQuotes({ searchParams }: { searchParams: Promis
         </form>
       )}
       {caseId && <QuotesTable caseId={caseId} />}
+      {caseId && <ComparativePanel caseId={caseId} version={cv ? Number(cv) : undefined} versionHref={(v) => `/dev/quotes?case=${caseId}&cv=${v}`} />}
     </div>
   );
 }
