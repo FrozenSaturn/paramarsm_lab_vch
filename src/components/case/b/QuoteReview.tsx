@@ -52,19 +52,19 @@ export async function QuoteReview({ quoteId, page, pageHref, confirmAction }: {
       <div style={{ display: "grid", gridTemplateColumns: "minmax(380px, 5fr) 7fr", gap: 16 }}>
         <div style={{ position: "sticky", top: 8, alignSelf: "start" }}>
           {pdfUrl
-            ? <iframe key={firstPage} src={pdfUrl} title="Quote PDF" style={{ width: "100%", height: "85vh", border: "1px solid #ddd", borderRadius: 6 }} />
+            ? <iframe key={firstPage} src={pdfUrl} title="Quote PDF" style={{ width: "100%", height: "85vh", border: "1px solid var(--hairline)", borderRadius: 12 }} />
             : <p style={s.muted}>PDF not available.</p>}
         </div>
 
         <div>
           {toReview.length > 0 && (
-            <section style={{ ...s.card, borderColor: "#f59e0b" }}>
+            <section style={{ ...s.card, borderColor: "color-mix(in srgb, var(--warn) 45%, var(--hairline))" }}>
               <h3 style={{ marginTop: 0 }}>Waiting for you ({toReview.length})</h3>
               <p style={s.muted}>Check each value against the page and confirm it, or type what the page actually says.</p>
               {toReview.map((l: any) => {
                 const sr = second(l.serial);
                 return (
-                  <form key={l.id} action={confirmAction} style={{ display: "grid", gridTemplateColumns: "2fr 1.4fr 1fr auto", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f1f1f1" }}>
+                  <form key={l.id} action={confirmAction} style={{ display: "grid", gridTemplateColumns: "2fr 1.4fr 1fr auto", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--hairline)" }}>
                     <input type="hidden" name="quote_id" value={quoteId} />
                     <input type="hidden" name="key" value={`line:${String(l.serial).trim()}:rate`} />
                     <div>

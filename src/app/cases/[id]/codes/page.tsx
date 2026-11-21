@@ -60,7 +60,7 @@ export default async function Codes({ params }: { params: Promise<{ id: string }
         const s = flags.find(f => f.type === "code_suggestion");
         const done = flags.find(f => f.type === "code_confirmed" || f.type === "new_code_pending");
         return (
-          <div key={l.id} style={{ borderTop: "1px solid #ddd", padding: "8px 0" }}>
+          <div key={l.id} style={{ borderTop: "1px solid var(--hairline)", padding: "12px 0" }}>
             <b>{l.serial}.</b> {l.description} <i>({l.quantity ?? "not measured"} {l.unit})</i> site code: {flags.find(f => f.type === "site_code")?.value ?? "none"}
             {done && <div>{done.type === "code_confirmed" ? "Confirmed" : "New code requested"}: <b>{l.item_code}</b></div>}
             {!done && s && (

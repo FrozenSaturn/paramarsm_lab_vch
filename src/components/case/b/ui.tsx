@@ -1,32 +1,22 @@
 import type { CSSProperties, ReactNode } from "react";
 
-/** Minimal shared styling for B's panels until the app adopts Tailwind/shadcn (PLAN.md section 10). */
+/** Shared styling for B's panels. Values are DESIGN.md tokens from app/globals.css, so the panels follow the theme. */
 export const s = {
-  table: { borderCollapse: "collapse", width: "100%", fontSize: 13 } as CSSProperties,
-  th: { textAlign: "left", borderBottom: "2px solid #ddd", padding: "6px 8px", whiteSpace: "nowrap", fontWeight: 600 } as CSSProperties,
-  td: { borderBottom: "1px solid #eee", padding: "6px 8px", verticalAlign: "top" } as CSSProperties,
+  table: { width: "100%", fontSize: 13 } as CSSProperties,
+  th: { textAlign: "left" } as CSSProperties,
+  td: {} as CSSProperties,
   num: { textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" } as CSSProperties,
-  muted: { color: "#666", fontSize: 12 } as CSSProperties,
-  card: { border: "1px solid #e5e5e5", borderRadius: 8, padding: 12, marginBottom: 12, background: "#fff" } as CSSProperties,
-  button: { padding: "4px 10px", border: "1px solid #999", borderRadius: 6, background: "#f7f7f7", cursor: "pointer", fontSize: 13 } as CSSProperties,
-  primary: { padding: "6px 12px", border: "1px solid #1d4ed8", borderRadius: 6, background: "#2563eb", color: "#fff", cursor: "pointer", fontSize: 13 } as CSSProperties,
+  muted: { color: "var(--ink-subtle)", fontSize: 12 } as CSSProperties,
+  card: { border: "1px solid var(--hairline)", borderRadius: 12, padding: 16, marginBottom: 16, background: "var(--surface-1)" } as CSSProperties,
+  button: {} as CSSProperties,
+  primary: { background: "var(--primary)", borderColor: "var(--primary)", color: "var(--on-primary)" } as CSSProperties,
 };
 
-const TONES = {
-  info: { background: "#eef2ff", color: "#3730a3" },
-  warn: { background: "#fef3c7", color: "#92400e" },
-  block: { background: "#fee2e2", color: "#991b1b" },
-  ok: { background: "#dcfce7", color: "#166534" },
-  plain: { background: "#f1f5f9", color: "#334155" },
-} as const;
+const TONES = { info: "badge-info", warn: "badge-warn", block: "badge-block", ok: "badge-ok", plain: "" } as const;
 export type Tone = keyof typeof TONES;
 
 export function Badge({ tone = "plain", children, title }: { tone?: Tone; children: ReactNode; title?: string }) {
-  return (
-    <span title={title} style={{ ...TONES[tone], borderRadius: 999, padding: "1px 8px", fontSize: 12, marginRight: 4, display: "inline-block", whiteSpace: "nowrap" }}>
-      {children}
-    </span>
-  );
+  return <span title={title} className={`badge ${TONES[tone]}`} style={{ marginRight: 4 }}>{children}</span>;
 }
 
 export const statusTone = (status: string): Tone =>

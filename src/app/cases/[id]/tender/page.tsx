@@ -37,7 +37,7 @@ export default async function Tender({ params }: { params: Promise<{ id: string 
       <>
         <p><Link href={`/cases/${id}`}>Back to case</Link></p>
         <h1>Tender for {cs.title}</h1>
-        {similar.length > 0 && <div style={{ background: "#fef3c7", padding: 8 }}><b>Similar tender found.</b>{similar.map(s => <div key={s.rfqRef}>{s.rfqRef} "{s.caseTitle}" ({s.status}, {s.quotesIn} quotes in, score {s.score}): {s.reasons.join("; ")}</div>)}</div>}
+        {similar.length > 0 && <div className="notice notice-warn" style={{ display: "block" }}><b>Similar tender found.</b>{similar.map(s => <div key={s.rfqRef}>{s.rfqRef} "{s.caseTitle}" ({s.status}, {s.quotesIn} quotes in, score {s.score}): {s.reasons.join("; ")}</div>)}</div>}
         <p>The BOQ must be accepted and every line must have a confirmed item code.</p>
         <form action={prepare}><label>Quote due date <input type="date" name="due" /></label> (default: 7 days) <button>Prepare tender and draft RFQs</button></form>
       </>
@@ -61,14 +61,14 @@ export default async function Tender({ params }: { params: Promise<{ id: string 
       <p>Quote due {rfq.due_date}. The SOP needs at least 3 vendors.</p>
 
       <h2>Vendors</h2>
-      <table cellPadding={4}><thead><tr><th align="left">Vendor</th><th align="left">Email</th><th align="left">Mail</th><th align="left">Reminders</th><th align="left">Quote</th></tr></thead>
+      <table><thead><tr><th align="left">Vendor</th><th align="left">Email</th><th align="left">Mail</th><th align="left">Reminders</th><th align="left">Quote</th></tr></thead>
         <tbody>{(rrs ?? []).map(r => <tr key={r.id}><td>{(r as any).vendors.name}</td><td>{r.email}</td><td>{r.status}{r.sent_at ? ` ${new Date(r.sent_at).toLocaleString()}` : ""}</td><td>{r.reminders_sent}</td><td>{vendorQuoted.has((r as any).vendor_id) ? "received" : "waiting"}</td></tr>)}</tbody></table>
 
       {drafts.length > 0 && <>
         <h2>Drafts waiting ({drafts.length})</h2>
         <p><BatchButton rfqId={rfq.id} count={drafts.length} /> Each mail is sent from your Gmail with the tender pack attached. You can also edit and send one at a time.</p>
         {drafts.map(a => <details key={a.id} style={{ margin: "8px 0" }}><summary>{((a.payload as any).to ?? []).join(", ")}</summary>
-          {a.error && <p style={{ color: "#b91c1c" }}>Last error: {a.error}</p>}
+          {a.error && <p className="err">Last error: {a.error}</p>}
           <DraftEditor actionId={a.id} to={(a.payload as any).to ?? []} cc={(a.payload as any).cc} subject={(a.payload as any).subject} body={(a.payload as any).body} sendLabel="Send this RFQ" /></details>)}</>}
 
       <h2>Reminders</h2>

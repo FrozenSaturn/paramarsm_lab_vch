@@ -7,7 +7,7 @@ import { ClarificationEditor } from "./editor";
 export const dynamic = "force-dynamic";
 
 type Flag = { type: string; [k: string]: any };
-const color = { error: "#b91c1c", warn: "#b45309", info: "#555" } as const;
+const color = { error: "var(--danger)", warn: "var(--warn)", info: "var(--ink-subtle)" } as const;
 
 export default async function BoqPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePageUser();
@@ -42,11 +42,11 @@ export default async function BoqPage({ params }: { params: Promise<{ id: string
       {findings.length === 0 ? <p>No findings.</p> : <ul>{findings.map((f, i) => <li key={i} style={{ color: color[f.severity] }}>[{f.severity}] {f.message}</li>)}</ul>}
 
       <h2>Lines</h2>
-      <table cellPadding={4} style={{ borderCollapse: "collapse" }}>
+      <table>
         <thead><tr><th align="left">#</th><th align="left">Site code</th><th align="left">Description</th><th align="right">Quantity</th><th align="left">Unit</th><th align="left">Flags</th></tr></thead>
         <tbody>{(lines ?? []).map(l => {
           const fl = (l.flags ?? []) as Flag[];
-          return <tr key={l.id} style={{ borderTop: "1px solid #ddd" }}>
+          return <tr key={l.id}>
             <td>{l.serial}</td><td>{fl.find(f => f.type === "site_code")?.value ?? ""}</td><td>{l.description}</td>
             <td align="right">{l.quantity == null ? "—" : Math.round(Number(l.quantity) * 100) / 100}</td><td>{l.unit}</td>
             <td>{fl.filter(f => f.type === "not_measured" || f.type === "check").map(f => f.type === "not_measured" ? "not measured" : f.code).join(", ")}</td></tr>;

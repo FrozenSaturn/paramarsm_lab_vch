@@ -29,7 +29,7 @@ export async function QuotesTable({ caseId, reviewHref = (id: string) => `/dev/q
             <td style={s.td}>v{q.version}</td>
             <td style={s.td}>
               <Badge tone={statusTone(q.status)}>{q.status.replace("_", " ")}</Badge>
-              {q.error && <div style={{ ...s.muted, color: "#991b1b" }}>{q.error}</div>}
+              {q.error && <div style={{ ...s.muted, color: "var(--danger)" }}>{q.error}</div>}
             </td>
             <td style={s.td}>{fmtDate(q.quote_date)}</td>
             <td style={{ ...s.td, ...s.num }}>
