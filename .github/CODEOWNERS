@@ -1,0 +1,13 @@
+# Replace with each builder's GitHub handle.
+/docs/WORK_PERSON_A.md        @FrozenSaturn
+/supabase/migrations/1*       @FrozenSaturn
+/src/channels/                @FrozenSaturn
+/src/executor/                @FrozenSaturn
+/src/workflows/a/             @FrozenSaturn
+/src/agents/a/                @FrozenSaturn
+/src/components/case/a/       @FrozenSaturn
+/src/lib/                     @FrozenSaturn
+/src/erp/                     @FrozenSaturn
+/scripts/seed/a/              @FrozenSaturn
+# B-owned: add B's handle
+# /supabase/migrations/2*  /src/workflows/b/  /src/agents/b/  /src/quotes/ /src/compare/ /src/scoring/ /src/context/ /src/memory/ /src/search/ /src/components/case/b/ /scripts/seed/b/ /fixtures/
