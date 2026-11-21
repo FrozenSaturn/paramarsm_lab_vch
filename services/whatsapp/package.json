@@ -1,0 +1,25 @@
+{
+  "name": "vch-whatsapp",
+  "private": true,
+  "type": "module",
+  "description": "WhatsApp read and send microservice over Evolution API",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "up": "mkdir -p data && docker compose up -d --build",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f bridge evolution",
+    "dev": "node --watch --env-file-if-exists=.env src/server.ts",
+    "wa": "node --env-file-if-exists=.env src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.7.2"
+  }
+}
