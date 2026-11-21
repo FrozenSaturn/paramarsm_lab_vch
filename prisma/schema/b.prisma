@@ -150,6 +150,14 @@ model comparatives {
   version    Int
   matrix     Json
   created_at DateTime? @default(now()) @db.Timestamptz(6)
+  // W6 (B, stage 3). Everything needed to re-derive the numbers is kept on the row.
+  rfq_id      String?  @db.Uuid
+  quote_ids   Json     @default("[]")  // the quote versions that went in
+  weights     Json?                     // the weights used for this version's scores
+  category    String?                   // weights category, e.g. "waterproofing" or "default"
+  inputs_hash String?                   // sha256 of the canonical inputs; same hash gives the same numbers
+  trigger     String?                   // button|all_quoted|due_date|revised_quote|script
+  created_by  String?                   // user id, or the workflow name
   scores           scores[]
   recommendations  recommendations[]
   @@unique([case_id, version])
@@ -162,8 +170,18 @@ model scores {
   total          Decimal?
   breakdown      Json?
   flags          Json?
+  rank           Int?     // 1 = top on the stored weights (B, stage 3)
   comparative    comparatives @relation(fields: [comparative_id], references: [id])
   @@index([comparative_id])
+}
+
+/// Scoring weights per work category (PLAN.md section 7.4). The HOD edits them; "default" is the fallback.
+model scoring_weights {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category   String   @unique
+  weights    Json     // { price, past_performance, delivery_fit, compliance, responsiveness, commercial }, sum 100
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
 }
 
 model recommendations {
