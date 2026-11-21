@@ -79,6 +79,10 @@ This list is the state of `main`.
   - It stores the raw `.eml` file in Storage first. Then it parses the mail with `mailparser`.
   - `quoted.ts` cuts the quoted chain. The newest part is the message body.
   - A reply links to its RFQ by Gmail thread. If that fails, it uses the `[VIN-RFQ-####]` token in the subject.
+  - A `From` header is not proof of the sender. The poller links a mail to a case, an RFQ or a vendor only when Gmail's own `Authentication-Results` entry (from `mx.google.com`) says `dmarc=pass`. It also requires the sender to be a recipient of that RFQ. Otherwise the mail stays unmatched. A subject token with no passed check gets the classification `unverified_reply`. A person must review it.
+  - The sender check ignores case and a `+tag`. If several vendors share one mailbox and no thread names the vendor, the vendor stays empty and no `quote.received` is sent.
+  - A failed attachment removes the message row, so the next poll starts again. Events go out only after everything is stored. If one message keeps failing, the poller logs a failed step in `agent_steps` and continues with the other mail.
+  - The unique index on `(case_id, sha256)` ignores a file that is already stored in the same case. Such a file sends no new events.
   - It saves attachments to Storage and `documents`. It skips a mail that is already stored.
   - It emits `message.stored`, `document.stored` and `quote.received`. The `quote.received` event needs a known RFQ and vendor.
   - The classification `vendor_reply` is a rule for now. Triage (W0) will replace it.

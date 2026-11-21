@@ -41,7 +41,13 @@ export async function pollMailbox(userId: string) {
   }
 
   let imported = 0;
-  for (const id of ids) if (await importMessage(userId, id)) imported++;
+  for (const id of ids) {
+    try { if (await importMessage(userId, id)) imported++; }
+    catch (e: any) {
+      // One bad message must not block the rest. The failure is logged. Its import can be run again by Gmail id.
+      await db.from("agent_steps").insert({ workflow: "gmail-poll", step: `import failed: ${id}`, status: "failed", output: { gmail_id: id, error: String(e?.message ?? e) }, finished_at: new Date().toISOString() });
+    }
+  }
   // Move the pointer only after every message in this batch was handled.
   await db.from("mail_tokens").update({ history_id: newest, updated_at: new Date().toISOString() }).eq("user_id", userId);
   return { imported, historyId: newest };
@@ -74,12 +80,12 @@ export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; t
   const text = mail.text ?? htmlToText(mail.html || "");
   const { latest, quoted } = splitQuoted(text);
 
-  const match = await matchRfq(threadId, subject, from);
+  const match = await matchRfq(mail, threadId, subject, from);
 
   const { data: msg, error } = await db.from("messages").insert({
     case_id: match?.caseId ?? null, channel: "email", direction: "in", external_id: gmailId, thread_id: threadId,
     sender: from, recipients, subject, body: latest, raw_path: rawPath,
-    classification: match ? "vendor_reply" : null, // rule-based until triage (W0) classifies with a model
+    classification: match ? "vendor_reply" : (/\[VIN-RFQ-\d+\]/i.test(subject) ? "unverified_reply" : null), // rule-based until triage (W0) classifies with a model. An RFQ token without a passed sender check needs a person.
   }).select("id").single();
   if (error) {
     if (error.code === "23505") return false; // another poll run stored it first
@@ -88,45 +94,79 @@ export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; t
   // The quoted part is context, not the message. Keep it in the raw mail; chunks use the latest text.
   void quoted;
 
-  await emit("message.stored", { message_id: msg.id, case_id: match?.caseId }, { caseId: match?.caseId, actor: "gmail-poller" });
-
-  for (const a of mail.attachments) {
-    if (a.contentDisposition === "inline" && !a.filename) continue; // signature images
-    const sha = createHash("sha256").update(a.content).digest("hex");
-    const path = `mail/${gmailId}/${sha.slice(0, 12)}-${safeName(a.filename ?? "attachment")}`;
-    const put = await db.storage.from(BUCKET).upload(path, a.content, { contentType: a.contentType, upsert: true });
-    if (put.error) throw new Error(`could not store attachment: ${put.error.message}`);
-    const { data: doc, error: de } = await db.from("documents").insert({
-      case_id: match?.caseId ?? null, message_id: msg.id, filename: a.filename ?? "attachment", mime: a.contentType, storage_path: path, sha256: sha,
-      kind: match && QUOTE_TYPES.test(a.contentType) ? "quote" : null,
-    }).select("id").single();
-    if (de) { if (de.code === "23505") continue; throw de; } // same file already stored for this case
-    await emit("document.stored", { document_id: doc.id, message_id: msg.id }, { caseId: match?.caseId, actor: "gmail-poller" });
-    // B reads quotes from this event. Needs a known RFQ and vendor.
-    if (match?.vendorId && match.rfqId && QUOTE_TYPES.test(a.contentType)) {
-      await emit("quote.received", { case_id: match.caseId, rfq_id: match.rfqId, vendor_id: match.vendorId, document_id: doc.id }, { caseId: match.caseId, actor: "gmail-poller" });
+  // A message row means "seen". So if any attachment fails, remove the row: the next poll then starts clean.
+  // Events go out only after everything is stored.
+  const opts = { caseId: match?.caseId, actor: "gmail-poller" };
+  const events: (() => Promise<void>)[] = [() => emit("message.stored", { message_id: msg.id, case_id: match?.caseId }, opts)];
+  try {
+    for (const a of mail.attachments) {
+      if (a.contentDisposition === "inline" && !a.filename) continue; // signature images
+      const sha = createHash("sha256").update(a.content).digest("hex");
+      const path = `mail/${gmailId}/${sha.slice(0, 12)}-${safeName(a.filename ?? "attachment")}`;
+      const put = await db.storage.from(BUCKET).upload(path, a.content, { contentType: a.contentType, upsert: true });
+      if (put.error) throw new Error(`could not store attachment: ${put.error.message}`);
+      const { data: doc, error: de } = await db.from("documents").insert({
+        case_id: match?.caseId ?? null, message_id: msg.id, filename: a.filename ?? "attachment", mime: a.contentType, storage_path: path, sha256: sha,
+        kind: match && QUOTE_TYPES.test(a.contentType) ? "quote" : null,
+      }).select("id").single();
+      if (de) { if (de.code === "23505") continue; throw de; } // same file already stored for this case
+      events.push(() => emit("document.stored", { document_id: doc.id, message_id: msg.id }, opts));
+      // B reads quotes from this event. Needs a known RFQ and vendor.
+      if (match?.vendorId && match.rfqId && QUOTE_TYPES.test(a.contentType))
+        events.push(() => emit("quote.received", { case_id: match.caseId, rfq_id: match.rfqId, vendor_id: match.vendorId!, document_id: doc.id }, opts));
     }
+  } catch (e) {
+    await db.from("documents").delete().eq("message_id", msg.id);
+    await db.from("messages").delete().eq("id", msg.id);
+    throw e;
   }
+  for (const send of events) await send();
   return true;
 }
 
-/** Link a reply to its RFQ: first by Gmail thread, then by the [VIN-RFQ-####] token in the subject. */
-async function matchRfq(threadId: string | null, subject: string, from: string | null) {
+/** Gmail adds an Authentication-Results header with its own server name on top. A sender can add a
+ *  fake one lower in the mail, so we read only the entry from Gmail's server and require DMARC to pass. */
+export function senderAuthenticated(mail: ParsedMail): boolean {
+  const h = mail.headers.get("authentication-results");
+  const list = (Array.isArray(h) ? h : h ? [h] : []).map(x => (typeof x === "string" ? x : (x as any).value ?? String(x)));
+  const gmailEntry = list.find(x => /^\s*mx\.google\.com\s*;/i.test(x));
+  return !!gmailEntry && /\bdmarc=pass\b/i.test(gmailEntry);
+}
+
+/** Same mailbox, ignoring case and a +tag. The demo vendors are plus-addresses of one Gmail account. */
+const baseAddr = (a: string) => { const [u, d] = a.trim().toLowerCase().split("@"); return `${u.split("+")[0]}@${d}`; };
+
+/** Link a reply to its RFQ: first by Gmail thread, then by the [VIN-RFQ-####] token in the subject.
+ *  A From header is not proof of who sent the mail. We attribute a reply (case, RFQ, vendor) only when
+ *  Gmail's own check says DMARC passed. Otherwise the mail stays unmatched for a person to review. */
+async function matchRfq(mail: ParsedMail, threadId: string | null, subject: string, from: string | null) {
+  if (!from || !senderAuthenticated(mail)) return null;
   const db = admin();
+  const recipientsOf = async (rfqId: string) =>
+    ((await db.from("rfq_recipients").select("vendor_id, email").eq("rfq_id", rfqId)).data ?? []) as { vendor_id: string; email: string | null }[];
+  // The vendor must be a recipient of this RFQ, and the sender must be that recipient's mailbox.
+  const vendorFor = (rows: { vendor_id: string; email: string | null }[]) => {
+    const hits = rows.filter(r => r.email && baseAddr(r.email) === baseAddr(from));
+    return new Set(hits.map(h => h.vendor_id)).size === 1 ? hits[0].vendor_id : null; // several vendors share one mailbox: ambiguous
+  };
+
   if (threadId) {
-    const { data } = await db.from("rfq_recipients").select("rfq_id, vendor_id, rfqs!inner(case_id)").eq("gmail_thread_id", threadId).limit(1).maybeSingle();
-    if (data) return { rfqId: data.rfq_id as string, vendorId: data.vendor_id as string, caseId: (data as any).rfqs.case_id as string };
+    const { data } = await db.from("rfq_recipients").select("rfq_id, vendor_id, email, rfqs!inner(case_id)").eq("gmail_thread_id", threadId).limit(1).maybeSingle();
+    if (data) {
+      // A thread we started names the vendor, so shared mailboxes are not ambiguous here.
+      // The sender must still be that recipient. Another sender in the thread stays unmatched.
+      if (!data.email || baseAddr(data.email) !== baseAddr(from)) return null;
+      return { rfqId: data.rfq_id as string, vendorId: data.vendor_id as string, caseId: (data as any).rfqs.case_id as string };
+    }
   }
   const token = subject.match(/\[VIN-(RFQ-\d+)\]/i);
   if (token) {
     const { data: rfq } = await db.from("rfqs").select("id, case_id").eq("ref", token[1].toUpperCase()).maybeSingle();
     if (rfq) {
-      let vendorId: string | null = null;
-      if (from) {
-        const { data: rr } = await db.from("rfq_recipients").select("vendor_id").eq("rfq_id", rfq.id).ilike("email", from).maybeSingle();
-        vendorId = rr?.vendor_id ?? null;
-      }
-      return { rfqId: rfq.id as string, vendorId, caseId: rfq.case_id as string };
+      const rows = await recipientsOf(rfq.id);
+      // A subject token alone proves nothing. The sender must be a recipient of this RFQ.
+      if (!rows.some(r => r.email && baseAddr(r.email) === baseAddr(from))) return null;
+      return { rfqId: rfq.id as string, vendorId: vendorFor(rows), caseId: rfq.case_id as string };
     }
   }
   return null;
