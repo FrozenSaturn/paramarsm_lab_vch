@@ -1,3 +1,3 @@
 export default function Settings() {
-  return <><h1>Settings</h1><p>Outbound mode: {process.env.OUTBOUND_MODE ?? "sandbox"}</p></>;
+  return <><h1>Settings</h1><p>Mailbox, WhatsApp and approval settings will appear here.</p></>;
 }
