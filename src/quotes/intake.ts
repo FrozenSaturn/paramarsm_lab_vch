@@ -135,7 +135,9 @@ export async function saveQuote(
     scope: n.scope, flags: n.flags, needs_review: n.needs_review, review_reasons: n.review_reasons,
     conditions: x.vendor_conditions, extraction: raw, second_read: read.secondRead,
     model: read.calls[0]?.model ?? read.source, prompt_version: READ_PROMPT_VERSION,
-    status: n.needs_review ? "needs_review" : "ready", error: null, updated_at: new Date().toISOString(),
+    // Not ready until lines, terms and evidence are all written (supabase-js has no transaction):
+    // a failure part-way leaves 'extracting' (W5 then marks it 'failed'), never a misleading 'ready'.
+    status: "extracting", error: null, updated_at: new Date().toISOString(),
   }).eq("id", quoteId);
   if (qErr) throw qErr;
 
@@ -179,6 +181,9 @@ export async function saveQuote(
     const { error: fErr } = await db.from("extracted_fields").insert(fields);
     if (fErr) throw fErr;
   }
+
+  const { error: sErr } = await db.from("quotes").update({ status: n.needs_review ? "needs_review" : "ready", updated_at: new Date().toISOString() }).eq("id", quoteId);
+  if (sErr) throw sErr;
 
   // This version supersedes older ones from the same vendor on this case (never newer ones).
   const { data: self } = await db.from("quotes").select("version").eq("id", quoteId).single();
