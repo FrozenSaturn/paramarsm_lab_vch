@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 /** Dev only: start W5 on a stored PDF without any channel. "Emit" goes through Inngest; "Read now" runs W5 in this request. */
 async function startIntake(form: FormData) {
   "use server";
-  if (process.env.NODE_ENV === "production") notFound();
+  if ((process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_PAGES !== "true")) notFound();
   await requireRole("contracts_engineer", "hod", "admin");
   const input = {
     case_id: String(form.get("case_id")), rfq_id: String(form.get("rfq_id")),
@@ -28,7 +28,7 @@ async function startIntake(form: FormData) {
 }
 
 export default async function DevQuotes({ searchParams }: { searchParams: Promise<{ case?: string; cv?: string }> }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  if ((process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_PAGES !== "true")) notFound();
   await requirePageUser();
   const { case: caseParam, cv } = await searchParams;
   const db = admin();
