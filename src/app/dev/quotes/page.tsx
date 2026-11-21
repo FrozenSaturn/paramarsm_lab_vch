@@ -7,6 +7,7 @@ import { publish } from "@/workflows/b/publish";
 import { runQuoteIntake } from "@/quotes/intake";
 import { QuotesTable } from "@/components/case/b/QuotesTable";
 import { ComparativePanel } from "@/components/case/b/ComparativePanel";
+import { RecommendationPanel } from "@/components/case/b/RecommendationPanel";
 import { s } from "@/components/case/b/ui";
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,8 @@ export default async function DevQuotes({ searchParams }: { searchParams: Promis
         </form>
       )}
       {caseId && <QuotesTable caseId={caseId} />}
-      {caseId && <ComparativePanel caseId={caseId} version={cv ? Number(cv) : undefined} versionHref={(v) => `/dev/quotes?case=${caseId}&cv=${v}`} />}
+      {caseId && <div id="comparative"><ComparativePanel caseId={caseId} version={cv ? Number(cv) : undefined} versionHref={(v) => `/dev/quotes?case=${caseId}&cv=${v}`} /></div>}
+      {caseId && <RecommendationPanel caseId={caseId} />}
     </div>
   );
 }
