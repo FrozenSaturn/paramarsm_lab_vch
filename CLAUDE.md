@@ -74,6 +74,16 @@ This list is the state of `main`.
   - The MIME builder encodes non-ASCII subjects and removes line breaks from header values.
   - The `send_email` handler is in `src/executor/handlers/a/send-email.ts`. It sends the approved payload from the mailbox of the approver. It saves the sent mail in `messages`. For an RFQ it updates `rfq_recipients` and emits `rfq.sent`.
   - The page `/dev/mail` tests the path: create a draft, propose the action, approve it.
+- **Gmail poll.** `src/channels/gmail/poller.ts` reads new mail from the inbox.
+  - The first poll sets a starting point and imports nothing. Old mail is not imported.
+  - It stores the raw `.eml` file in Storage first. Then it parses the mail with `mailparser`.
+  - `quoted.ts` cuts the quoted chain. The newest part is the message body.
+  - A reply links to its RFQ by Gmail thread. If that fails, it uses the `[VIN-RFQ-####]` token in the subject.
+  - It saves attachments to Storage and `documents`. It skips a mail that is already stored.
+  - It emits `message.stored`, `document.stored` and `quote.received`. The `quote.received` event needs a known RFQ and vendor.
+  - The classification `vendor_reply` is a rule for now. Triage (W0) will replace it.
+  - The Inngest function `gmail-poll` runs every minute. It runs only when `RUN_INGEST=true`.
+  - `emit()` starts Inngest workflows when `EMIT_DISPATCHES_TO_INNGEST=true`. Set this on every machine.
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 

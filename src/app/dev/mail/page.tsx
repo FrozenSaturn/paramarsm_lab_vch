@@ -4,6 +4,7 @@ import { admin } from "@/lib/supabase";
 import { requireRole } from "@/lib/auth";
 import { proposeAction } from "@/executor";
 import { createDraft } from "@/channels/gmail/drafts";
+import { pollMailbox } from "@/channels/gmail/poller";
 import { ApproveButton } from "./approve-button";
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,21 @@ async function draft(form: FormData) {
   revalidatePath("/dev/mail");
 }
 
+async function pollNow() {
+  "use server";
+  if (process.env.NODE_ENV === "production") notFound();
+  const user = await requireRole("admin", "contracts_engineer");
+  const r = await pollMailbox(user.id);
+  await admin().from("agent_steps").insert({ workflow: "gmail-poll", step: "poll now", output: r, status: "done", finished_at: new Date().toISOString() });
+  revalidatePath("/dev/mail");
+}
+
 export default async function DevMail() {
   if (process.env.NODE_ENV === "production") notFound();
   const user = await requireRole("admin", "contracts_engineer");
   const db = admin();
   const { data: token } = await db.from("mail_tokens").select("updated_at").eq("user_id", user.id).maybeSingle();
+  const { data: lastPoll } = await db.from("agent_steps").select("output,finished_at").eq("workflow", "gmail-poll").order("started_at", { ascending: false }).limit(1).maybeSingle();
   const { data: acts } = await db.from("actions").select("id,status,payload,error").eq("kind", "send_email").order("created_at", { ascending: false }).limit(10);
   return (
     <>
@@ -34,6 +45,7 @@ export default async function DevMail() {
         <textarea name="body" placeholder="body" rows={4} required />
         <button>Create Gmail draft and propose send</button>
       </form>
+      <form action={pollNow}><button>Poll Gmail now</button> Last poll: {lastPoll ? `${lastPoll.finished_at} ${JSON.stringify(lastPoll.output)}` : "never (the first poll sets the starting point and imports nothing)"}</form>
       <h2>Actions</h2>
       <ul>{(acts ?? []).map(a => (
         <li key={a.id}>{a.id.slice(0, 8)} [{a.status}] {(a.payload as any).subject} to {(a.payload as any).to?.join(", ")}
