@@ -1,12 +1,30 @@
+import { redirect } from "next/navigation";
 import { admin } from "@/lib/supabase";
+import { requireRole } from "@/lib/auth";
+import { runBoqCheck } from "@/boq/pipeline";
 import { ActionButtons } from "@/components/ActionButtons";
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "");
 
 /** The conversation of a case across channels: mail in, mail out. */
 export async function ConversationList({ caseId }: { caseId: string }) {
-  const { data } = await admin().from("messages").select("id, channel, direction, sender, recipients, subject, body, classification, created_at").eq("case_id", caseId).order("created_at");
+  const db = admin();
+  const { data } = await db.from("messages").select("id, channel, direction, sender, recipients, subject, body, classification, created_at").eq("case_id", caseId).order("created_at");
   if (!data?.length) return <p>No messages for this case yet.</p>;
+  const { data: docs } = await db.from("documents").select("id, message_id, filename, mime").in("message_id", data.map(m => m.id));
+  const sheetsOf = (mid: string) => (docs ?? []).filter(d => d.message_id === mid && /spreadsheet|excel|\.xlsx$/i.test(`${d.mime} ${d.filename}`));
+
+  /** A sheet that arrives on an existing case waits for a person. This button is that person's decision. */
+  async function readAsBoq(form: FormData) {
+    "use server";
+    await requireRole("contracts_engineer", "admin");
+    const documentId = String(form.get("document"));
+    const { data: d } = await admin().from("documents").select("id, case_id").eq("id", documentId).single();
+    if (!d?.case_id) throw new Error("This file is not on a case.");
+    const { data: inbound } = await admin().from("messages").select("subject, body").eq("case_id", d.case_id).eq("direction", "in").order("created_at");
+    await runBoqCheck({ caseId: d.case_id, documentId, requirementText: (inbound ?? []).map(m => `${m.subject ?? ""}\n${m.body ?? ""}`).join("\n") });
+    redirect(`/cases/${d.case_id}/boq`);
+  }
   return (
     <ol style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
       {data.map(m => (
@@ -16,6 +34,11 @@ export async function ConversationList({ caseId }: { caseId: string }) {
           </div>
           <div><b>{m.subject}</b></div>
           {m.body && <div style={{ whiteSpace: "pre-wrap", opacity: 0.85 }}>{m.body.length > 280 ? `${m.body.slice(0, 280)}...` : m.body}</div>}
+          {sheetsOf(m.id).map(d => (
+            <form key={d.id} action={readAsBoq} style={{ marginTop: 4 }}>
+              <input type="hidden" name="document" value={d.id} />
+              <span style={{ opacity: 0.8 }}>{d.filename} </span><button>Read as the BOQ</button>
+            </form>))}
         </li>))}
     </ol>
   );
