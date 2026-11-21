@@ -4,6 +4,7 @@ import { requirePageUser, requireRole } from "@/lib/auth";
 import { admin } from "@/lib/supabase";
 import { openCase, triageMessage } from "@/triage/triage";
 import { runBoqCheck } from "@/boq/pipeline";
+import { PageHead, Pill, Empty, label, ago } from "@/components/ui";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
@@ -29,20 +30,34 @@ async function openCaseFromMessage(form: FormData) {
   revalidatePath("/inbox");
 }
 
+const CHANNEL: Record<string, string> = { email: "Email", gmail: "Email", whatsapp: "WhatsApp" };
+
 export default async function Inbox() {
   await requirePageUser();
   const { data } = await admin().from("messages").select("id, channel, sender, subject, classification, case_id, sender_verified, created_at").eq("direction", "in").order("created_at", { ascending: false }).limit(50);
+  const rows = data ?? [];
   return (
     <>
-      <h1>Inbox</h1>
-      {!(data ?? []).length && <p>No inbound messages yet.</p>}
-      <ul>{(data ?? []).map(m => (
-        <li key={m.id} style={{ margin: "6px 0" }}>
-          [{m.channel}] {m.sender}{m.sender_verified ? "" : " (sender not verified)"}: <b>{m.subject}</b> — {m.classification ?? "not sorted yet"}
-          {m.case_id ? <> — <Link href={`/cases/${m.case_id}`}>open case</Link></> : null}
-          {!m.classification && <form action={runTriage} style={{ display: "inline" }}><input type="hidden" name="id" value={m.id} /> <button>Sort it</button></form>}
-          {!m.case_id && (m.classification === "requirement" || !m.classification) && <form action={openCaseFromMessage} style={{ display: "inline" }}><input type="hidden" name="id" value={m.id} /> <button>Open case from this mail</button></form>}
-        </li>))}</ul>
+      <PageHead title="Inbox" sub="Every message that reached the Vinayak mailbox or WhatsApp number, with the class the triage agent gave it." />
+      <div className="list">
+        {rows.length === 0 && <Empty>No inbound messages yet.</Empty>}
+        {rows.map(m => (
+          <div key={m.id} className="list-row">
+            <div style={{ minWidth: 0 }}>
+              <div className="title">{m.subject || "(no subject)"}</div>
+              <div className="sub">{m.sender}{m.sender_verified ? "" : " · sender not verified"} · {ago(m.created_at)}</div>
+            </div>
+            <div className="row">
+              <Pill>{CHANNEL[m.channel] ?? m.channel}</Pill>
+              <Pill tone={m.classification ? "info" : "plain"}>{m.classification ? label(m.classification) : "not sorted yet"}</Pill>
+              {!m.sender_verified && <Pill tone="warn">unverified</Pill>}
+              {m.case_id && <Link href={`/cases/${m.case_id}`} className="btn btn-ghost">Open case →</Link>}
+              {!m.classification && <form action={runTriage}><input type="hidden" name="id" value={m.id} /><button>Sort it</button></form>}
+              {!m.case_id && (m.classification === "requirement" || !m.classification) && <form action={openCaseFromMessage}><input type="hidden" name="id" value={m.id} /><button className="btn-primary">Open case from this mail</button></form>}
+            </div>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
