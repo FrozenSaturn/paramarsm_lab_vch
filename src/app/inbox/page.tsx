@@ -20,9 +20,10 @@ async function openCaseFromMessage(form: FormData) {
   await requireRole("contracts_engineer", "admin");
   const db = admin();
   const id = String(form.get("id"));
-  const { data: m } = await db.from("messages").select("id, subject, body, case_id, sender").eq("id", id).single();
+  const { data: m } = await db.from("messages").select("id, subject, body, case_id, sender, sender_verified").eq("id", id).single();
   if (!m || m.case_id) return;
-  const { data: person } = m.sender ? await db.from("people").select("project_id").ilike("email", m.sender.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle() : { data: null };
+  // The project comes from a person record only when the sender is verified. Otherwise the case has no project.
+  const { data: person } = m.sender && m.sender_verified ? await db.from("people").select("project_id").ilike("email", m.sender.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle() : { data: null };
   const caseId = await openCase(id, String(form.get("title") || m.subject || "New requirement"), person?.project_id ?? null);
   const { data: docs } = await db.from("documents").select("id, filename, mime").eq("message_id", id);
   const sheet = (docs ?? []).find(d => /spreadsheet|excel|\.xlsx$/i.test(`${d.mime} ${d.filename}`));
