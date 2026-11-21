@@ -23,7 +23,7 @@ async function confirm(form: FormData) {
 
 // Lives under /dev until the case workspace mounts it at /cases/[id]/quotes/[quoteId] (route in A's folder; see for-A issue).
 export default async function QuoteReviewPage({ params, searchParams }: { params: Promise<{ quoteId: string }>; searchParams: Promise<{ page?: string }> }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  if ((process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_PAGES !== "true")) notFound();
   await requirePageUser();
   const { quoteId } = await params;
   const { page } = await searchParams;

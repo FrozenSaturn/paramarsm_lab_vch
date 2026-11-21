@@ -17,5 +17,6 @@ export async function GET(req: Request) {
       await admin().from("mail_tokens").upsert({ user_id: data.user.id, refresh_token: data.session.provider_refresh_token });
     }
   }
-  return NextResponse.redirect(new URL("/cases", url.origin));
+  // Relative redirect: behind the Vercel proxy, url.origin is the laptop's address, not the public domain.
+  return new NextResponse(null, { status: 307, headers: { Location: "/cases" } });
 }
