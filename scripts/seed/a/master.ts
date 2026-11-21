@@ -61,6 +61,8 @@ export const vendorEmail = (slug: string) => {
   return `${user}+${slug}@${host}`;
 };
 
+const CIVIL_INVITEES: Record<string, string> = { IKBCONSTRUCTION: "ikb", VISHNUINFRACON: "vishnu", RAJTRIMURTIINFRAPROJECTSPVTLTD: "rajtrimurti", JBENTERPRISE: "jb" };
+
 export async function seedVendors(db: pg.Client) {
   const ids: Record<string, string> = {};
   for (const v of QUOTING) {
@@ -81,6 +83,12 @@ export async function seedVendors(db: pg.Client) {
     const id = await upsert(db, "vendors", { name }, { source: "Contractor_list_Aquina.xlsx", is_demo: true });
     // Heuristic from the name only; a model refines these later. Marked inferred so nobody mistakes it for fact.
     await upsert(db, "vendor_categories", { vendor_id: id, category: guess(name) }, { inferred: true });
+    // A few civil contractors get a plus-address contact, so a road-work tender has vendors to invite. Mail still lands in our one inbox.
+    const slug = CIVIL_INVITEES[norm(name)];
+    if (slug) {
+      await db.query(`delete from vendor_contacts where vendor_id = $1 and email <> $2`, [id, vendorEmail(slug)]);
+      await upsert(db, "vendor_contacts", { vendor_id: id, email: vendorEmail(slug) }, { name });
+    }
     n++;
   }
   return { quoting: Object.keys(ids).length, aquina: n, ids };
