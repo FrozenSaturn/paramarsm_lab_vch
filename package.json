@@ -15,7 +15,8 @@
     "db:validate": "prisma validate",
     "test": "tsx --test 'src/**/*.test.ts'",
     "seed:b-dev": "tsx --env-file=.env scripts/seed/b/dev-fixtures.ts",
-    "eval:read": "tsx --env-file=.env scripts/b/eval-read.ts"
+    "eval:read": "tsx --env-file=.env scripts/b/eval-read.ts",
+    "compare:run": "tsx --env-file=.env scripts/b/run-compare.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
