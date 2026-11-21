@@ -1,4 +1,5 @@
 import { requirePageUser } from "@/lib/auth";
+import Link from "next/link";
 import { admin } from "@/lib/supabase";
 import { tabsA } from "@/components/case/a/tabs";
 import { tabsB } from "@/components/case/b/tabs";
@@ -18,7 +19,7 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 16 }}>
       <section><h3>Conversation</h3></section>
-      <section><h2>{c.title}</h2><p>Stage: {c.stage}</p><p>Tabs: {tabs.map(t => t.label).join(" · ")}</p></section>
+      <section><h2>{c.title}</h2><p>Stage: {c.stage}</p><p>Tabs: {tabs.map(t => t.label).join(" · ")}</p><p><Link href={`/cases/${id}/boq`}>BOQ</Link> | <Link href={`/cases/${id}/codes`}>Item codes</Link></p></section>
       <aside>
         <h3>Pending approvals</h3><ul>{(pending ?? []).map(a => <li key={a.id}>{a.kind}</li>)}</ul>
         <h3>Agent activity</h3><ul>{(steps ?? []).map(s => <li key={s.id}>{s.step} ({s.status})</li>)}</ul>

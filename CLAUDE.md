@@ -88,6 +88,21 @@ This list is the state of `main`.
   - The classification `vendor_reply` is a rule for now. Triage (W0) will replace it.
   - The Inngest function `gmail-poll` runs every minute. It runs only when `RUN_INGEST=true`.
   - `emit()` starts Inngest workflows when `EMIT_DISPATCHES_TO_INNGEST=true`. Set this on every machine.
+- **BOQ check (W1).** Code is in `src/boq/`.
+  - `parse.ts` reads a BOQ sheet cell by cell. It finds the header row, the unit column, the quantity column and the part columns. It works on the Amara and the Aquina sheets.
+  - `check.ts` runs these checks: not measured, quantity not more than zero, no unit, unknown unit, parts do not add up to the total, sqm and sqft disagree, duplicate serial, duplicate description, grand total, and (with the site message) no dates and no scope.
+  - `clarificationDraft` writes a plain message to site from the findings.
+  - `pipeline.ts` (`runBoqCheck`) saves a new `boq_versions` row and the lines, saves each finding in `extracted_fields` (entity `boq_version`), and proposes a `send_clarification` action. The `send_clarification` action uses the same handler as `send_email`.
+  - Pages: `/dev/boq` (upload a sheet), `/cases/[id]/boq` (checks, lines, editable clarification, Accept BOQ). Accept BOQ emits `boq.accepted`.
+- **Item-code mapping (W2).** Code is in `src/codes/` and `src/erp/`.
+  - `src/erp/hygiene.ts` builds the hygiene report. The page is `/item-codes`.
+  - `candidates.ts` finds the 10 nearest codes by embedding and the 10 nearest by trigram. Two SQL functions do this (migration `20261121100000_item_code_search_fns`).
+  - `attributes.ts` reads place, surface, grouting type, height and variant from a description.
+  - `judge.ts` is the rule-based judge. It gives each code a score from description match, embedding, attributes and site code. A conflict in place, surface, grouting or height cuts the score. Thresholds: auto at 0.78 with a margin of 0.06, new below 0.45. The result is `auto`, `review` or `new`, with reasons.
+  - `pipeline.ts` saves the suggestion as a `code_suggestion` flag on each `boq_lines` row. `confirmCode` checks the role, sets the code and saves an alias in `code_aliases`. The next BOQ with the same wording maps at once. It emits `codes.confirmed` when every line has a code.
+  - A new code is proposed in `code_proposals` and follows the pattern of the nearest code. Nothing goes to the ERP.
+  - Page: `/cases/[id]/codes`. The Inngest function `w2-code-mapping` starts on `boq.accepted`.
+  - The model judge (Claude) is not built. Only the rule judge runs. See Known issues.
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 
@@ -106,6 +121,8 @@ This list is the state of `main`.
 
 ## Known issues
 
+- The item-code judge uses rules only. The plan says Claude judges. `ANTHROPIC_API_KEY` is empty, so a model judge cannot be tested yet. Add it behind `judge()` and compare its answer with the rule answer.
+- The master has a block of B codes that is shifted by one against the first block. For example, `WP.04.B` is kitchen floor at serial 24 and kitchen wall at serial 65. The hygiene report shows this. A person must decide which meaning is right before the ERP is changed.
 - Use TypeScript 5. Next.js 15 does not support TypeScript 7. With TypeScript 7 the build ignores the `@/` paths.
 - Do not use the `googleapis` package. Its types use too much memory in the Next.js build. Use `@googleapis/gmail` and `google-auth-library`.
 - Add `http://localhost:3000/auth/callback` to the redirect URLs in the Supabase dashboard (Authentication, URL Configuration).

@@ -3,6 +3,7 @@ import { admin } from "../../../lib/supabase";
 import { emit } from "../../../lib/steps";
 import { sendDraft, sendMail, updateDraft } from "../../../channels/gmail/drafts";
 import type { MailInput } from "../../../channels/gmail/mime";
+import type { Handler } from "../../../contracts/actions";
 
 /** Payload of a `send_email` action. The approved payload is what we send, including the engineer's edits. */
 export interface SendEmailPayload extends MailInput {
@@ -11,7 +12,7 @@ export interface SendEmailPayload extends MailInput {
   rfq_recipient_id?: string;  // set for RFQs: records the thread and the send time
 }
 
-registerHandler("send_email", async (action) => {
+const sendEmail: Handler = async (action) => {
   const p = action.payload as unknown as SendEmailPayload;
   // Record identifiers come from the payload the agent proposed, never from the approver's edits.
   // An edit may change the text and the recipients. It may not point the send at another record.
@@ -44,4 +45,7 @@ registerHandler("send_email", async (action) => {
     if (rr) await emit("rfq.sent", { rfq_id: rr.rfq_id, vendor_id: rr.vendor_id, sent_at: sentAt }, { caseId: action.case_id ?? undefined });
   }
   return { provider_id: sent.messageId, result: { threadId: sent.threadId } };
-});
+};
+// A clarification to site is an email too. Both kinds go through the same code.
+registerHandler("send_email", sendEmail);
+registerHandler("send_clarification", sendEmail);
