@@ -1,0 +1,112 @@
+{
+  "_note": "Ground truth for the four sample quotes, read by a person from the PDFs. Used by unit tests (as if the model had read them perfectly) and by scripts/b/eval-read.ts to score the model's reading. Pages are 1-based PDF pages. The PDFs stay in vinayak-vch3-data/ so there is one copy to delete after the event.",
+  "rfq_sent_at": "2026-11-16",
+  "quotes": [
+    {
+      "vendor_key": "bajrang",
+      "file": "vinayak-vch3-data/06_quotations/Quotation_Bajrang_Construction.pdf",
+      "pages": 6,
+      "scanned": false,
+      "header": {
+        "vendor_name": "Bajrang Construction & Waterproofing",
+        "gstin": "19ABDFB3296M1ZY",
+        "quote_date": "2026-05-21",
+        "reference": "BC&W/15/26-27",
+        "validity": "45 days from the date of our Quotation",
+        "gst_treatment": "GST @ 18% as applicable",
+        "payment_terms": "25% with order; RA bills paid within 30 days; final within 30 days of bills",
+        "advance": "25% payment along with the order",
+        "mobilisation": "Within 14 days after getting the order",
+        "warranty": "10 years on non-judicial stamp paper"
+      },
+      "lines": [
+        { "serial": "1", "boq_serial": "1", "unit": "SQFT", "quantity": 30420, "rate": 34.5, "amount": null, "page": 2, "handwritten": false },
+        { "serial": "2", "boq_serial": "2", "unit": "SQFT", "quantity": 26300, "rate": 34.5, "amount": null, "page": 2, "handwritten": false },
+        { "serial": "3", "boq_serial": "3", "unit": "SQM.", "quantity": 1030, "rate": 34.5, "amount": null, "page": 3, "handwritten": false },
+        { "serial": "4", "boq_serial": "4", "unit": "SQFT", "quantity": 7590, "rate": 34.5, "amount": null, "page": 3, "handwritten": false },
+        { "serial": "5", "boq_serial": "5", "unit": "SQFT", "quantity": 1300, "rate": 34.5, "amount": null, "page": 4, "handwritten": false },
+        { "serial": "6", "boq_serial": "6", "unit": "SQFT", "quantity": 23720, "rate": 34.5, "amount": null, "page": 4, "handwritten": false },
+        { "serial": "7", "boq_serial": "7", "unit": "SQFT", "quantity": 11300, "rate": 34.5, "amount": null, "page": 5, "handwritten": false }
+      ],
+      "stated_totals": [],
+      "terms": { "pf_esi": "not_stated", "tds": "not_stated", "security_deposit": "not_stated", "gst_extra": "met", "site_facilities": "not_met", "safety_ppe": "not_stated" }
+    },
+    {
+      "vendor_key": "purvyakruti",
+      "file": "vinayak-vch3-data/06_quotations/Quotation_Purvyakruti.pdf",
+      "pages": 4,
+      "scanned": false,
+      "header": {
+        "vendor_name": "Purvyakruti Sales & Services Pvt. Ltd.",
+        "gstin": null,
+        "quote_date": "2026-11-17",
+        "gst_treatment": "Rates exclude GST, payable extra as per Government norms",
+        "payment_terms": "Monthly RA bills paid within 7 days; final bill within 15 days",
+        "advance": "50% material secured advance against supply of material at site"
+      },
+      "lines": [
+        { "serial": "1", "boq_serial": "1", "unit": "SQFT", "quantity": 13429.53, "rate": 47, "amount": 631187.91, "page": 1, "handwritten": false },
+        { "serial": "2", "boq_serial": "2", "unit": "SQFT", "quantity": 11558.76, "rate": 47, "amount": 543261.72, "page": 1, "handwritten": false },
+        { "serial": "3", "boq_serial": "3", "unit": "RMT", "quantity": 500, "rate": 47, "amount": 23500, "page": 1, "handwritten": false },
+        { "serial": "4", "boq_serial": "4", "unit": "SQFT", "quantity": 1802.48, "rate": 47, "amount": 84716.56, "page": 2, "handwritten": false },
+        { "serial": "5", "boq_serial": "5", "unit": "SQFT", "quantity": 1920.32, "rate": 47, "amount": 90255.04, "page": 2, "handwritten": false },
+        { "serial": "6", "boq_serial": "6", "unit": "SQFT", "quantity": 8741.32, "rate": 47, "amount": 410842.04, "page": 3, "handwritten": false },
+        { "serial": "7", "boq_serial": "7", "unit": "SQFT", "quantity": 2443.59, "rate": 47, "amount": 114848.73, "page": 3, "handwritten": false }
+      ],
+      "stated_totals": [
+        { "label": "Total", "amount": 1197949.63, "is_grand_total": false, "page": 1 },
+        { "label": "Total", "amount": 585813.64, "is_grand_total": false, "page": 3 },
+        { "label": "Total", "amount": 114848.73, "is_grand_total": false, "page": 3 }
+      ],
+      "terms": { "pf_esi": "not_stated", "tds": "not_stated", "security_deposit": "not_stated", "gst_extra": "met", "site_facilities": "not_met", "safety_ppe": "not_stated" }
+    },
+    {
+      "vendor_key": "shyama",
+      "file": "vinayak-vch3-data/06_quotations/Quotation_Shyama.pdf",
+      "pages": 6,
+      "scanned": false,
+      "header": {
+        "vendor_name": "Shyama's Prevention & Cure Co.",
+        "gstin": null,
+        "quote_date": null,
+        "gst_treatment": "GST @ 18% charged extra on total value of bill",
+        "payment_terms": "Will be fixed after discussion"
+      },
+      "lines": [
+        { "serial": "1", "boq_serial": "1", "unit": "SQFT", "quantity": 30420, "rate": 42, "amount": 1277640, "page": 1, "handwritten": false },
+        { "serial": "2", "boq_serial": "2", "unit": "SQFT", "quantity": 26300, "rate": 42, "amount": 1104600, "page": 1, "handwritten": false },
+        { "serial": "3", "boq_serial": "3", "unit": "RMT", "quantity": 1030, "rate": 87, "amount": 89610, "page": 1, "handwritten": false },
+        { "serial": "4", "boq_serial": "4", "unit": "SQFT", "quantity": 7590, "rate": 38, "amount": 288420, "page": 3, "handwritten": false },
+        { "serial": "5", "boq_serial": "5", "unit": "SQFT", "quantity": 1300, "rate": 38, "amount": 49400, "page": 3, "handwritten": false },
+        { "serial": "6", "boq_serial": "6", "unit": "SQFT", "quantity": 23720, "rate": 42, "amount": 996240, "page": 3, "handwritten": false },
+        { "serial": "7", "boq_serial": "7", "unit": "SQFT", "quantity": 11300, "rate": 42, "amount": 474600, "page": 5, "handwritten": false }
+      ],
+      "stated_totals": [
+        { "label": "Total", "amount": 4280510, "is_grand_total": true, "page": 5 }
+      ],
+      "terms": { "pf_esi": "not_stated", "tds": "not_stated", "security_deposit": "not_stated", "gst_extra": "met", "site_facilities": "not_met", "safety_ppe": "not_stated" }
+    },
+    {
+      "vendor_key": "sk",
+      "file": "vinayak-vch3-data/06_quotations/Quotation_SK_Construction.pdf",
+      "pages": 3,
+      "scanned": true,
+      "header": {
+        "vendor_name": "S.K. Construction",
+        "gstin": null,
+        "quote_date": "2026-05-15"
+      },
+      "lines": [
+        { "serial": "1", "boq_serial": "1", "unit": "SQFT", "quantity": 30420, "rate": 34, "amount": null, "page": 1, "handwritten": true },
+        { "serial": "2", "boq_serial": "2", "unit": "SQFT", "quantity": 26300, "rate": 34, "amount": null, "page": 1, "handwritten": true },
+        { "serial": "3", "boq_serial": "3", "unit": "RMT", "quantity": 1030, "rate": 50, "amount": null, "page": 1, "handwritten": true },
+        { "serial": "4", "boq_serial": "4", "unit": "SQFT", "quantity": 7590, "rate": 34, "amount": null, "page": 2, "handwritten": true },
+        { "serial": "5", "boq_serial": "5", "unit": "SQFT", "quantity": 1300, "rate": 34, "amount": null, "page": 2, "handwritten": true },
+        { "serial": "6", "boq_serial": "6", "unit": "SQFT", "quantity": 23720, "rate": 34, "amount": null, "page": 2, "handwritten": true },
+        { "serial": "7", "boq_serial": "7", "unit": "SQFT", "quantity": 11300, "rate": 34, "amount": null, "page": 3, "handwritten": true }
+      ],
+      "stated_totals": [],
+      "terms": { "pf_esi": "not_stated", "tds": "not_stated", "security_deposit": "not_stated", "gst_extra": "not_stated", "site_facilities": "not_stated", "safety_ppe": "not_stated" }
+    }
+  ]
+}

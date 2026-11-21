@@ -9,5 +9,25 @@
 /src/lib/                     @FrozenSaturn
 /src/erp/                     @FrozenSaturn
 /scripts/seed/a/              @FrozenSaturn
-# B-owned: add B's handle
-# /prisma/schema/b.prisma  /src/workflows/b/  /src/agents/b/  /src/quotes/ /src/compare/ /src/scoring/ /src/context/ /src/memory/ /src/search/ /src/components/case/b/ /scripts/seed/b/ /fixtures/
+# B-owned
+/docs/WORK_PERSON_B.md        @Kaushik2003
+/prisma/schema/b.prisma       @Kaushik2003
+/src/workflows/b/             @Kaushik2003
+/src/agents/b/                @Kaushik2003
+/src/quotes/                  @Kaushik2003
+/src/compare/                 @Kaushik2003
+/src/scoring/                 @Kaushik2003
+/src/context/                 @Kaushik2003
+/src/memory/                  @Kaushik2003
+/src/search/                  @Kaushik2003
+/src/components/case/b/       @Kaushik2003
+/src/executor/handlers/b/     @Kaushik2003
+/src/app/approvals/           @Kaushik2003
+/src/app/vendors/             @Kaushik2003
+/src/app/audit/               @Kaushik2003
+/src/app/search/              @Kaushik2003
+/src/app/dev/quotes/          @Kaushik2003
+/src/app/nav.b.ts             @Kaushik2003
+/scripts/seed/b/              @Kaushik2003
+/scripts/b/                   @Kaushik2003
+/fixtures/                    @Kaushik2003

@@ -13,6 +13,7 @@ model extracted_fields {
   confirmed_by String?   @db.Uuid
   created_at   DateTime? @default(now()) @db.Timestamptz(6)
   @@index([entity_type, entity_id])
+  @@index([document_id])
 }
 
 model doc_chunks {
@@ -24,6 +25,7 @@ model doc_chunks {
   content     String
   embedding   Unsupported("vector(384)")?
   @@index([case_id])
+  @@index([document_id])
 }
 
 model vendor_performance {
@@ -48,6 +50,7 @@ model memory_refs {
   entity     String
   message_id String?   @db.Uuid
   created_at DateTime? @default(now()) @db.Timestamptz(6)
+  @@index([entity])
 }
 
 model quotes {
@@ -66,11 +69,38 @@ model quotes {
   advance        String?
   completion_time String?
   warranty       String?
-  status         String?   @default("extracting")
+  status         String?   @default("extracting") // extracting|needs_review|ready|failed|superseded (CHECK in raw SQL)
   created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  // W5 quote detail (B, stage 1-2). Printed by the vendor and read by the model, or computed by code.
+  gstin            String?
+  security_deposit String?
+  pf_esi           String?
+  mobilisation     String?
+  exclusions       String?
+  validity_days    Int?
+  valid_until      DateTime? @db.Date
+  gst_rate         Decimal?
+  vendor_total     Decimal?  // sum of the vendor's own quantity x rate (computed)
+  stated_total     Decimal?  // grand total as printed, if any
+  total_on_boq     Decimal?  // sum of vendor rate x Vinayak quantity over comparable lines (computed)
+  comparable_lines Int?
+  scope            String?   // matches|close|different|unknown (CHECK in raw SQL)
+  flags            Json      @default("[]")
+  needs_review     Boolean   @default(false)
+  review_reasons   Json      @default("[]")
+  conditions       Json      @default("[]")
+  extraction       Json?     // the model's raw reading, never edited, so everything can be re-derived
+  second_read      Json?     // independent second read of handwritten rates
+  confirmations    Json      @default("{}") // values a person confirmed or corrected, laid over extraction
+  model            String?
+  prompt_version   String?
+  error            String?
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
   lines          quote_lines[]
   terms          quote_terms[]
   @@index([case_id])
+  @@index([document_id])
+  @@unique([case_id, vendor_id, version])
 }
 
 model quote_lines {
@@ -85,6 +115,23 @@ model quote_lines {
   normalized_rate Decimal?
   flags           Json?    @default("[]")
   quote           quotes   @relation(fields: [quote_id], references: [id])
+  // W5 line detail (B, stage 1-2)
+  serial           String?
+  item             String?
+  unit_raw         String?
+  amount_stated    Decimal?  // as printed; null if the vendor printed none
+  amount_computed  Decimal?  // vendor quantity x vendor rate
+  normalized_unit  String?   // SQM for area, RMT for length
+  boq_unit         String?
+  boq_quantity     Decimal?  // Vinayak's quantity in the BOQ's unit
+  amount_on_boq    Decimal?  // vendor rate x Vinayak quantity; null when not comparable
+  qty_ratio        Decimal?
+  rate_handwritten Boolean   @default(false)
+  page             Int?
+  confidence       Decimal?
+  position         Int?
+  @@index([quote_id, position])
+  @@index([boq_line_id])
 }
 
 model quote_terms {
@@ -94,6 +141,7 @@ model quote_terms {
   status   String  // met|not_met|not_stated (CHECK in raw SQL)
   detail   String?
   quote    quotes  @relation(fields: [quote_id], references: [id])
+  @@unique([quote_id, term])
 }
 
 model comparatives {
@@ -115,6 +163,7 @@ model scores {
   breakdown      Json?
   flags          Json?
   comparative    comparatives @relation(fields: [comparative_id], references: [id])
+  @@index([comparative_id])
 }
 
 model recommendations {
@@ -125,6 +174,7 @@ model recommendations {
   created_at     DateTime? @default(now()) @db.Timestamptz(6)
   comparative    comparatives @relation(fields: [comparative_id], references: [id])
   decisions      decisions[]
+  @@index([comparative_id])
 }
 
 model decisions {
@@ -136,4 +186,5 @@ model decisions {
   reason            String?
   created_at        DateTime? @default(now()) @db.Timestamptz(6)
   recommendation    recommendations @relation(fields: [recommendation_id], references: [id])
+  @@index([recommendation_id])
 }

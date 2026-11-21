@@ -1,0 +1,18 @@
+{
+  "_note": "B dev data. The BOQ that went out with the RFQ, typed from the tender PDF: 7 lines in SQFT. A's master seed has the site sheet's BOQ instead (8 lines in SQM, two not measured); until A's seed or W1 adds the tender BOQ as the accepted version, scripts/seed/b/dev-fixtures.ts adds this one to A's Amara case.",
+  "source": "vinayak-vch3-data/03_tender/BOQ_Specification_Waterproofing_Amara_Tower-2_rates_blank.pdf",
+  "rfq": {
+    "ref": "DEV-B-RFQ-AMARA-WP",
+    "sent_at": "2026-11-16T18:14:00+05:30",
+    "due_date": "2026-11-23"
+  },
+  "lines": [
+    { "serial": "1", "description": "WATERPROOFING AT TOILET FLOOR", "unit": "SQFT", "quantity": 13429.53, "page": 1 },
+    { "serial": "2", "description": "WATERPROOFING AT TOILET WALL (UPTO 450 MM HEIGHT)", "unit": "SQFT", "quantity": 11558.76, "page": 1 },
+    { "serial": "3", "description": "WATERPROOFING ON TOILET DEPRESSION", "unit": "RMT", "quantity": 500, "page": 1 },
+    { "serial": "4", "description": "WATERPROOFING AT KITCHEN & WASH PART_FLOOR", "unit": "SQFT", "quantity": 1802.48, "page": 2 },
+    { "serial": "5", "description": "WATERPROOFING AT KITCHEN & WASH PART_WALL", "unit": "SQFT", "quantity": 1920.32, "page": 2 },
+    { "serial": "6", "description": "WATERPROOFING AT BALCONY & SKY TERRACE_FLOOR", "unit": "SQFT", "quantity": 8741.32, "page": 2 },
+    { "serial": "7", "description": "WATERPROOFING AT BALCONY & SKY TERRACE_WALL", "unit": "SQFT", "quantity": 2443.59, "page": 3 }
+  ]
+}
