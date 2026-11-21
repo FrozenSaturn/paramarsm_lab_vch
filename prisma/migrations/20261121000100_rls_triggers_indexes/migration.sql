@@ -28,9 +28,9 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXEC
 
 -- Row-level security: on for every table. Signed-in profiles read; writes go through the service key.
 DO $$ DECLARE t text; BEGIN
-  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE '\_prisma%' LOOP
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
-    IF t NOT IN ('allowed_users','mail_tokens','profiles') THEN
+    IF t NOT IN ('allowed_users','mail_tokens','profiles','_prisma_migrations') THEN
       EXECUTE format('CREATE POLICY "read_%1$s" ON %1$I FOR SELECT USING (app_role() IS NOT NULL)', t);
     END IF;
   END LOOP;
