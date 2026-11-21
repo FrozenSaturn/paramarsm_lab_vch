@@ -18,7 +18,7 @@ import { HEADER_FIELDS, type ExtractedQuote } from "./schema";
 import { fixtureByFilename, fixtureExtraction, fixtureSecondRead, type FixtureVendor } from "./fixture-quotes";
 import { READ_PROMPT_VERSION } from "./prompts";
 import { publish } from "@/workflows/b/publish";
-import { applyConfirmations, confirmedKeys, type Confirmations } from "./review";
+import { applyConfirmations, confirmedKeys, type Confirmations } from "./confirmations";
 
 export type IntakeInput = EventMap["quote.received"];
 const WF = "W5 quote intake";
@@ -180,9 +180,10 @@ export async function saveQuote(
     if (fErr) throw fErr;
   }
 
-  // A newer version supersedes older ones from the same vendor on this case.
+  // This version supersedes older ones from the same vendor on this case (never newer ones).
+  const { data: self } = await db.from("quotes").select("version").eq("id", quoteId).single();
   await db.from("quotes").update({ status: "superseded", updated_at: new Date().toISOString() })
-    .eq("case_id", input.case_id).eq("vendor_id", input.vendor_id).neq("id", quoteId).in("status", ["ready", "needs_review"]);
+    .eq("case_id", input.case_id).eq("vendor_id", input.vendor_id).lt("version", self?.version ?? 1).in("status", ["ready", "needs_review"]);
 
   const flagSummary = n.flags.filter((f) => f.severity !== "info").map((f) => f.message);
   await logStep({

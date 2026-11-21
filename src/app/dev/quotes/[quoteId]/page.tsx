@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePageUser } from "@/lib/auth";
 import { admin } from "@/lib/supabase";
-import { confirmValue, type ConfirmKey } from "@/quotes/review";
+import { confirmValue } from "@/quotes/review";
 import { QuoteReview } from "@/components/case/b/QuoteReview";
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 async function confirm(form: FormData) {
   "use server";
   const quoteId = String(form.get("quote_id"));
-  const key = String(form.get("key")) as ConfirmKey;
+  const key = String(form.get("key")); // checked against the reading inside confirmValue
   const raw = String(form.get("value") ?? "").trim();
   const numeric = /:(rate|quantity)$/.test(key);
   const value = raw === "" ? null : numeric ? Number(raw) : raw;
