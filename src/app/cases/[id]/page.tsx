@@ -1,9 +1,11 @@
+import { requirePageUser } from "@/lib/auth";
 import { admin } from "@/lib/supabase";
 import { tabsA } from "@/components/case/a/tabs";
 import { tabsB } from "@/components/case/b/tabs";
 export const dynamic = "force-dynamic";
 
 export default async function CasePage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser();
   const { id } = await params;
   const db = admin();
   const [{ data: c }, { data: steps }, { data: pending }] = await Promise.all([

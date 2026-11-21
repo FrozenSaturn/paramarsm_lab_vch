@@ -9,7 +9,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   try {
-    const out = await editAction(id, body.payload);
+    const out = await editAction(id, user.id, body.payload);
     return NextResponse.json({ ok: true, out });
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.message?.startsWith("forbidden") ? 403 : 400 }); }
 }

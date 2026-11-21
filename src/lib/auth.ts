@@ -18,3 +18,11 @@ export async function requireRole(...roles: Role[]) {
   if (!u || !roles.includes(u.role)) throw new Error("forbidden");
   return u;
 }
+
+/** For server pages: redirect to /login unless a signed-in, allow-listed user. */
+export async function requirePageUser() {
+  const { redirect } = await import("next/navigation");
+  const u = await getUser();
+  if (!u) redirect("/login");
+  return u!;
+}

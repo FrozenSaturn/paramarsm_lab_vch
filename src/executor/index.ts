@@ -14,6 +14,16 @@ const APPROVERS: Record<ActionKind, Role[]> = {
   performance_record: ["contracts_engineer", "hod", "admin"],
 };
 
+async function assertCanAct(id: string, userId: string) {
+  const db = admin();
+  const { data: profile } = await db.from("profiles").select("role").eq("id", userId).single();
+  const { data: row } = await db.from("actions").select("*").eq("id", id).single();
+  if (!row) throw new Error("action not found");
+  const action = row as ActionRow;
+  if (!profile || !APPROVERS[action.kind]?.includes(profile.role)) throw new Error("forbidden: role cannot act on " + action.kind);
+  return action;
+}
+
 export async function proposeAction(kind: ActionKind, caseId: string | null, payload: Record<string, unknown>, opts: { proposedBy?: string } = {}) {
   const { data, error } = await admin().from("actions")
     .insert({ kind, case_id: caseId, payload, original_payload: payload, proposed_by: opts.proposedBy ?? "agent" })
@@ -22,13 +32,15 @@ export async function proposeAction(kind: ActionKind, caseId: string | null, pay
   return data as ActionRow;
 }
 
-export async function editAction(id: string, payload: Record<string, unknown>) {
-  const { error } = await admin().from("actions").update({ payload, status: "edited", updated_at: new Date().toISOString() })
+export async function editAction(id: string, userId: string, payload: Record<string, unknown>) {
+  await assertCanAct(id, userId);
+  const { error } = await admin().from("actions").update({ payload, status: "edited", edited_by: userId, updated_at: new Date().toISOString() })
     .eq("id", id).in("status", ["proposed", "edited"]);
   if (error) throw error;
 }
 
 export async function rejectAction(id: string, userId: string, reason: string) {
+  await assertCanAct(id, userId);
   const { error } = await admin().from("actions").update({ status: "rejected", reject_reason: reason, approved_by: userId, updated_at: new Date().toISOString() })
     .eq("id", id).in("status", ["proposed", "edited"]);
   if (error) throw error;
