@@ -102,7 +102,10 @@ This list is the state of `main`.
   - `pipeline.ts` saves the suggestion as a `code_suggestion` flag on each `boq_lines` row. `confirmCode` checks the role, sets the code and saves an alias in `code_aliases`. The next BOQ with the same wording maps at once. It emits `codes.confirmed` when every line has a code.
   - A new code is proposed in `code_proposals` and follows the pattern of the nearest code. Nothing goes to the ERP.
   - Page: `/cases/[id]/codes`. The Inngest function `w2-code-mapping` starts on `boq.accepted`.
-  - The model judge (Claude) is not built. Only the rule judge runs. See Known issues.
+  - `model-judge.ts` is the model judge. Claude (`CODE_JUDGE_MODEL`, default `claude-sonnet-5-5`) picks one of the numbered candidates or none. It has no tools and a fixed output schema. It can only choose from candidates that the search found. The prompt version is `code-judge-v1`.
+  - `combine()` in `judge.ts` joins the two answers. A line is auto-matched only when the rules say `auto`, Claude picks the same code with a confidence of 0.8 or more, and Claude does not say that the site code means something else. In all other cases the line goes to review, with both reasons and the Claude choice shown first. If the model call fails, the rule answer stays and a warning is added.
+  - Set `CODE_JUDGE=rules` to run the rules only. The model judge also needs `ANTHROPIC_API_KEY`.
+  - Each model call writes an `agent_steps` row with the model, the prompt version and the token counts.
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 
@@ -121,7 +124,7 @@ This list is the state of `main`.
 
 ## Known issues
 
-- The item-code judge uses rules only. The plan says Claude judges. `ANTHROPIC_API_KEY` is empty, so a model judge cannot be tested yet. Add it behind `judge()` and compare its answer with the rule answer.
+- On the Amara BOQ, Claude is stricter than the rules. It sends lines 4, 5 and 6 to review because the site wording is wider than the master (for example "kitchen & wash part" against "kitchen"). Decide with the client if that wording should auto-match when the site code is the same. If yes, change the prompt, and check it on more BOQs first.
 - The master has a block of B codes that is shifted by one against the first block. For example, `WP.04.B` is kitchen floor at serial 24 and kitchen wall at serial 65. The hygiene report shows this. A person must decide which meaning is right before the ERP is changed.
 - Use TypeScript 5. Next.js 15 does not support TypeScript 7. With TypeScript 7 the build ignores the `@/` paths.
 - Do not use the `googleapis` package. Its types use too much memory in the Next.js build. Use `@googleapis/gmail` and `google-auth-library`.

@@ -2,7 +2,8 @@ import { admin } from "../lib/supabase";
 import { logStep, emit } from "../lib/steps";
 import { normDesc } from "../erp/hygiene";
 import { aliasFor, findCandidates } from "./candidates";
-import { judge, type Suggestion } from "./judge";
+import { combine, judge, type Suggestion } from "./judge";
+import { modelJudge, PROMPT_VERSION } from "./model-judge";
 
 type Flag = { type: string; [k: string]: unknown };
 const siteCodeOf = (flags: Flag[]) => (flags.find(f => f.type === "site_code")?.value as string | undefined) ?? null;
@@ -13,7 +14,7 @@ export async function mapBoqVersion(boqVersionId: string) {
   const db = admin();
   const { data: ver } = await db.from("boq_versions").select("id, case_id").eq("id", boqVersionId).single();
   if (!ver) throw new Error("BOQ version not found");
-  const { data: lines } = await db.from("boq_lines").select("id, serial, description, item_code, flags").eq("boq_version_id", boqVersionId).order("serial");
+  const { data: lines } = await db.from("boq_lines").select("id, serial, description, unit, item_code, flags").eq("boq_version_id", boqVersionId).order("serial");
   const { data: all } = await db.from("item_codes").select("code");
   const allCodes = (all ?? []).map(r => r.code as string);
   const out: { serial: string | null; decision: string; top: string | null }[] = [];
@@ -23,16 +24,28 @@ export async function mapBoqVersion(boqVersionId: string) {
     const flags = (line.flags ?? []) as Flag[];
     const siteCode = siteCodeOf(flags);
     let s: Suggestion;
+    let usage: { model: string; input_tokens: number; output_tokens: number } | null = null;
     const alias = await aliasFor(line.description);
     if (alias) {
       s = { type: "code_suggestion", decision: "auto", confidence: 1, judged_by: "alias", reason: "A person confirmed this wording before.", warnings: [],
         picks: [{ ids: [alias.id], code: alias.code, description: alias.description, erp_serial: alias.erp_serial, serials: [alias.erp_serial], score: 1, agree: ["confirmed alias"], differ: [], conflicts: [], sameMeaningCodes: [] }] };
     } else {
-      s = judge({ description: line.description, siteCode }, await findCandidates(line.description, siteCode), allCodes);
+      const found = await findCandidates(line.description, siteCode);
+      s = judge({ description: line.description, siteCode }, found, allCodes);
+      // The model judge runs when a key is set. CODE_JUDGE=rules turns it off. A failure keeps the rule answer.
+      if (process.env.CODE_JUDGE !== "rules" && process.env.ANTHROPIC_API_KEY && s.picks.length) {
+        try {
+          const meanings = [...new Set(found.siteCodeRows.map(r => r.description.trim()))];
+          const m = await modelJudge({ description: line.description, unit: line.unit ?? null, siteCode }, s.picks, meanings);
+          s = combine(s, m);
+          usage = { model: m.model, input_tokens: m.input_tokens, output_tokens: m.output_tokens };
+        } catch (e: any) { s = combine(s, { error: String(e?.message ?? e).slice(0, 120) }); }
+      }
     }
     await db.from("boq_lines").update({ flags: [...withoutSuggestion(flags), s] }).eq("id", line.id);
-    await logStep({ caseId: ver.case_id, workflow: "W2", step: `map line ${line.serial}`, input: { description: line.description, siteCode },
-      output: { decision: s.decision, confidence: s.confidence, top: s.picks[0]?.code }, reasoning: s.reason, evidence: s.picks.slice(0, 3).map(p => ({ code: p.code, score: p.score })) });
+    await logStep({ caseId: ver.case_id, workflow: "W2", step: `map line ${line.serial}`, prompt_version: usage ? PROMPT_VERSION : undefined, input: { description: line.description, siteCode },
+      output: { decision: s.decision, confidence: s.confidence, top: s.picks[0]?.code, judged_by: s.judged_by, model_choice: s.model?.code ?? null, usage },
+      model: usage?.model, reasoning: s.reason, evidence: s.picks.slice(0, 3).map(p => ({ code: p.code, score: p.score })) });
     out.push({ serial: line.serial, decision: s.decision, top: s.picks[0]?.code ?? null });
   }
   return out;

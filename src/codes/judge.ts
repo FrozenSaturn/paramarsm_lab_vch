@@ -11,8 +11,9 @@ export interface Pick {
   score: number; agree: string[]; differ: string[]; conflicts: string[]; sameMeaningCodes: string[];
 }
 export interface Suggestion {
-  type: "code_suggestion"; decision: "auto" | "review" | "new"; confidence: number; judged_by: "rules" | "alias";
+  type: "code_suggestion"; decision: "auto" | "review" | "new"; confidence: number; judged_by: "rules" | "rules+claude" | "alias";
   reason: string; warnings: string[]; picks: Pick[];
+  model?: { code: string | null; confidence: number; reason: string; model: string; error?: string };
   proposed_new?: { code: string; description: string; nearest: { code: string; description: string }[] };
 }
 
@@ -89,4 +90,29 @@ export function proposeNewCode(siteCode: string | null, nearestCode: string | nu
   const re = new RegExp(`^${m[1]}\\.(\\d+)$`, "i");
   const max = Math.max(0, ...allCodes.map(c => c.match(re)?.[1]).filter(Boolean).map(Number));
   return `${m[1].toUpperCase()}.${String(max + 1).padStart(m[2].length, "0")}`;
+}
+
+/** Combine the rule answer with the model answer. A line is auto-matched only when both agree. */
+export function combine(rules: Suggestion, m: { choice: number; confidence: number; reason: string; model: string; site_code_means_something_else: boolean } | { error: string }): Suggestion {
+  if ("error" in m) return { ...rules, warnings: [...rules.warnings, `Model judge unavailable (${m.error}). Rules only.`], model: { code: null, confidence: 0, reason: "", model: "", error: m.error } };
+  const modelPick = m.choice > 0 ? rules.picks[m.choice - 1] : null;
+  const info = { code: modelPick?.code ?? null, confidence: m.confidence, reason: m.reason, model: m.model };
+  const rulesTop = rules.picks[0];
+  const sameAsRules = modelPick && rulesTop && normCode(modelPick.code) === normCode(rulesTop.code) && normDesc(modelPick.description) === normDesc(rulesTop.description);
+
+  if (rules.decision === "new") {
+    if (!modelPick) return { ...rules, judged_by: "rules+claude", model: info, reason: `${rules.reason} Claude agrees: ${m.reason}` };
+    return { ...rules, decision: "review", judged_by: "rules+claude", model: info, reason: `Rules propose a new code, but Claude chose ${modelPick.code}: ${m.reason}` };
+  }
+  if (rules.decision === "auto" && sameAsRules && m.confidence >= 0.8 && !m.site_code_means_something_else)
+    return { ...rules, judged_by: "rules+claude", confidence: Math.round(((rules.confidence + m.confidence) / 2) * 100) / 100, model: info, reason: `${rules.reason} Claude agrees: ${m.reason}` };
+
+  const why: string[] = [];
+  if (!modelPick) why.push(`Claude found no fitting code: ${m.reason}`);
+  else if (!sameAsRules) why.push(`Rules prefer ${rulesTop?.code}, Claude prefers ${modelPick.code}: ${m.reason}`);
+  else if (m.confidence < 0.8) why.push(`Claude is not sure (${m.confidence.toFixed(2)}): ${m.reason}`);
+  if (m.site_code_means_something_else) why.push("Claude says the site code means something else in the master.");
+  // Show the model's choice first so the engineer sees it.
+  const picks = modelPick ? [modelPick, ...rules.picks.filter(p => p !== modelPick)] : rules.picks;
+  return { ...rules, decision: "review", judged_by: "rules+claude", model: info, picks, reason: [rules.decision === "review" ? rules.reason : "", ...why].filter(Boolean).join(" | ") };
 }

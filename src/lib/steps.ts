@@ -16,10 +16,10 @@ export async function emit<N extends EventName>(name: N, payload: EventMap[N], o
   }
 }
 
-export async function logStep(s: { caseId?: string; workflow: string; step: string; input?: unknown; output?: unknown; model?: string; evidence?: unknown; reasoning?: string; status?: string }) {
+export async function logStep(s: { caseId?: string; workflow: string; step: string; input?: unknown; output?: unknown; model?: string; prompt_version?: string; evidence?: unknown; reasoning?: string; status?: string }) {
   const { data, error } = await admin().from("agent_steps").insert({
     case_id: s.caseId ?? null, workflow: s.workflow, step: s.step, input: s.input, output: s.output,
-    model: s.model, evidence: s.evidence, reasoning: s.reasoning, status: s.status ?? "done", finished_at: new Date().toISOString(),
+    model: s.model, prompt_version: s.prompt_version, evidence: s.evidence, reasoning: s.reasoning, status: s.status ?? "done", finished_at: new Date().toISOString(),
   }).select("id").single();
   if (error) throw error;
   return data.id as string;
