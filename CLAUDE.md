@@ -68,12 +68,18 @@ This list is the state of `main`.
   - 76 ERP item codes, with the duplicates kept on purpose;
   - the Amara Tower-2 case with 8 BOQ lines (`WP.03` and `WP.08` are not measured);
   - 2 past cases with RFQs, which are made-up data.
+- **Gmail send.** `src/channels/gmail/` has the Gmail client, the MIME builder and the draft functions.
+  - The client reads the refresh token from `mail_tokens`. The library gets a new access token when it needs one.
+  - `createDraft`, `updateDraft`, `sendDraft` and `sendMail` call the Gmail API.
+  - The MIME builder encodes non-ASCII subjects and removes line breaks from header values.
+  - The `send_email` handler is in `src/executor/handlers/a/send-email.ts`. It sends the approved payload from the mailbox of the approver. It saves the sent mail in `messages`. For an RFQ it updates `rfq_recipients` and emits `rfq.sent`.
+  - The page `/dev/mail` tests the path: create a draft, propose the action, approve it.
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 
 ## Not built yet (Person A)
 
-- The Gmail OAuth flow, drafts, the poller and the `send_email` handler.
+- The Gmail poller, the reply matching and the quoted-chain split.
 - Triage (W0), the BOQ check (W1), item-code mapping (W2), tender preparation (W3), dispatch and chase (W4).
 - WhatsApp through Evolution API, and Sarvam speech and translation.
 - The ERP import sheet, the hygiene report and the "view as" switch.
@@ -86,6 +92,10 @@ This list is the state of `main`.
 
 ## Known issues
 
+- Use TypeScript 5. Next.js 15 does not support TypeScript 7. With TypeScript 7 the build ignores the `@/` paths.
+- Do not use the `googleapis` package. Its types use too much memory in the Next.js build. Use `@googleapis/gmail` and `google-auth-library`.
+- Add `http://localhost:3000/auth/callback` to the redirect URLs in the Supabase dashboard (Authentication, URL Configuration).
+- The Gmail send path is not tested against a real mailbox yet.
 - `src/llm/` is old code from an earlier project. It imports files that do not exist. Rewrite it to the interface in `PLAN.md` section 3.
 - The migrations passed on Postgres 14 with a stand-in `auth` schema. They did not run on Supabase with pgvector. The first `supabase start` and `npm run db:reset` is the real test.
 - Writing embeddings to `item_codes` is not tested.
