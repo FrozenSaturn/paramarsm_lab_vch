@@ -20,7 +20,8 @@
     "recommend:run": "tsx --env-file=.env scripts/b/run-recommend.ts",
     "seed:b-memories": "tsx --env-file=.env scripts/seed/b/memories.ts",
     "index:docs": "tsx --env-file=.env scripts/b/index-docs.ts",
-    "eval:search": "tsx --env-file=.env scripts/b/eval-search.ts"
+    "eval:search": "tsx --env-file=.env scripts/b/eval-search.ts",
+    "seed:b-performance": "tsx --env-file=.env scripts/seed/b/performance.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
