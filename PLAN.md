@@ -45,7 +45,7 @@ Three rules from the problem statement are built in as hard constraints, not con
                                             │                  │
               ┌─────────────────────────────┼──────────────────┘
               ▼                             ▼
-   Agents (Claude API)              Action executor (plain code)
+   Agents (Sarvam API)              Action executor (plain code)
    classify · extract · match       send email · send WhatsApp ·
    draft · explain                  write ERP file · notify
               │                             │
@@ -60,14 +60,18 @@ Three rules from the problem statement are built in as hard constraints, not con
 | Layer | Choice | Why |
 | --- | --- | --- |
 | App and API | Next.js, TypeScript | One language across UI, API, workflows and the WhatsApp side (Evolution is Node) |
-| Database | Postgres on Neon, with pgvector | Already connected to this workspace; relational data, search vectors and audit log in one place |
-| File storage | S3-compatible bucket | Raw emails, PDFs, images, audio; never store files only in the model's context |
-| Workflows | Inngest (self-hostable; local dev server) | Event triggers, per-case concurrency, timers for reminders, and `waitForEvent` for approvals map directly onto what was asked. Alternative if a Postgres-only, MIT-licensed engine is preferred: DBOS |
-| Models | Claude: the most capable model for quote reading and reasoning, Haiku for classification and routing | Reads text PDFs, scans, handwriting and photos natively |
-| Speech to text | Whisper large-v3, self-hosted (`faster-whisper`) | Free; handles Bengali, Hindi and English voice notes. Keep it behind an interface so a hosted Indian-language service can be swapped in |
+| Database | Supabase (free tier), Postgres with the `vector` extension enabled | Free; relational data, search vectors and audit log in one place. Use the plain Postgres connection string from the app and keep the schema in SQL migrations, so we stay portable and can fall back to local Docker Postgres (`pgvector/pgvector:pg16`). Free projects are limited to 500 MB and pause after a week of inactivity |
+| File storage | Local disk behind a `FileStore` interface (`put`, `get`) | Free; raw emails, PDFs, images, audio. Swap to an S3-compatible store only if the client hosts it. Never store files only in the model's context |
+| Workflows | Inngest (self-hosted, free; local dev server) | Event triggers, per-case concurrency, timers for reminders, and `waitForEvent` for approvals map directly onto what was asked. Alternative if a Postgres-only, MIT-licensed engine is preferred: DBOS |
+| Models | **Sarvam AI** (we hold the API key): its largest chat model for extraction, reasoning and drafting; its smaller model for classification and routing | The only paid dependency. Strong on Hindi, Bengali and code-mixed text. All calls go through one `LLM` interface so the provider can change |
+| Document reading | Sarvam document OCR/parsing for scans and Indian-language pages; `unpdf` and `exceljs` for text PDFs and spreadsheets | Sarvam covers scans; the libraries are free and exact. **Verify on the SK scan that handwritten rates are read** (section 7.2) |
+| Embeddings | Local multilingual model through `@huggingface/transformers` (already in `package.json`), e.g. `multilingual-e5-small` | Free and offline; Sarvam has no embeddings endpoint we can rely on |
+| Speech to text | Sarvam speech-to-text (Indian languages, voice notes); local Whisper (`Xenova/whisper-small`) as the free fallback | Same key as the models; Whisper keeps working if credit runs out or the API is down |
 | WhatsApp | Evolution API in Docker, unmodified | See 4.1 |
 | Email | IMAP polling with `imapflow`, SMTP send | See 4.2 |
-| Memory | mem0 open source on the same pgvector | See section 6 |
+| Memory | mem0 open source on the same pgvector, using Sarvam for distillation and the local embedder | See section 6 |
+| Exports | `exceljs` for Excel, `pdfkit` or headless Chromium for PDF | Free libraries |
+| Hosting | Docker Compose on a laptop or one small VM | Nothing here needs a paid cloud service |
 
 ## 4. Ingestion
 
@@ -93,8 +97,8 @@ Every inbound item, whatever the channel, becomes one row in `messages` plus row
 | --- | --- |
 | Excel / CSV | Parsed cell by cell with a library. Numbers come from cells, never from a model's reading of them |
 | Text PDF | Text and layout extracted, plus page images to the model for tables |
-| Scanned PDF, photo | Page images to the model. Handwritten numbers are read twice independently; any disagreement goes to a person |
-| Voice note | Whisper transcript, original audio kept, transcript shown for confirmation |
+| Scanned PDF, photo | Sarvam document OCR, then the model structures the result. Handwritten numbers are read twice independently; any disagreement goes to a person |
+| Voice note | Sarvam speech-to-text (Whisper fallback), original audio kept, transcript shown for confirmation |
 | Plain text, chat | As is |
 
 Every extracted field is stored with its source document, page, the text snippet it came from and a confidence. That record is the "proof" shown later.
@@ -161,7 +165,7 @@ What the four sample quotes already require:
 - **Quantity mismatch.** Purvyakruti prices 13,429.53 sq ft of toilet floor, close to the BOQ's 13,424.54. Bajrang, Shyama and SK price 30,420. Comparison must therefore use each vendor's *rate* against *Vinayak's* quantity, and flag that the vendor priced a different scope.
 - **Stale quotes.** Bajrang's is dated 21.05.2026; the RFQ went out 16.11.2026.
 - **Unit disagreement.** Toilet depression is per running metre in the BOQ; Bajrang quotes it per square metre.
-- **A scan with handwriting.** SK's quote is a scanned printout with the rates written in by pen ("34/-", "50/-"). They are not in the text layer, so they are read from the image and confirmed by a person.
+- **A scan with handwriting.** SK's quote is a scanned printout with the rates written in by pen ("34/-", "50/-"). They are not in the text layer, so they are read from the image and always confirmed by a person. Open check: test Sarvam's OCR on this page first. If it misses the pen rates, fall back to a free local OCR for the first pass, with the human check unchanged.
 - **Vendor arithmetic.** Recompute every amount and total; show differences.
 - **Deviation from the six RFQ terms.** Each is checked and shown as met, not met or not stated.
 
