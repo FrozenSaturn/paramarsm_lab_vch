@@ -4,6 +4,7 @@ import { admin } from "../../lib/supabase";
 import { emit } from "../../lib/steps";
 import { gmailFor } from "./client";
 import { splitQuoted } from "./quoted";
+import { dmarcPassDomain, mailboxKey, parseAddr } from "./auth-results";
 
 const BUCKET = process.env.STORAGE_BUCKET || "documents";
 const QUOTE_TYPES = /pdf|spreadsheet|excel|csv|image\//i;
@@ -125,16 +126,20 @@ export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; t
 }
 
 /** Gmail adds an Authentication-Results header with its own server name on top. A sender can add a
- *  fake one lower in the mail, so we read only the entry from Gmail's server and require DMARC to pass. */
+ *  fake one lower in the mail, so we read only the first entry and it must name Gmail's server.
+ *  DMARC must pass for the same domain as the From address, and the mail must have exactly one From address. */
 export function senderAuthenticated(mail: ParsedMail): boolean {
+  const froms = mail.from?.value ?? [];
+  if (froms.length !== 1 || !froms[0].address) return false;
+  const from = parseAddr(froms[0].address);
+  if (!from) return false;
   const h = mail.headers.get("authentication-results");
   const list = (Array.isArray(h) ? h : h ? [h] : []).map(x => (typeof x === "string" ? x : (x as any).value ?? String(x)));
-  const gmailEntry = list.find(x => /^\s*mx\.google\.com\s*;/i.test(x));
-  return !!gmailEntry && /\bdmarc=pass\b/i.test(gmailEntry);
+  if (!list.length) return false;
+  return dmarcPassDomain(list[0]) === from.domain;
 }
 
-/** Same mailbox, ignoring case and a +tag. The demo vendors are plus-addresses of one Gmail account. */
-const baseAddr = (a: string) => { const [u, d] = a.trim().toLowerCase().split("@"); return `${u.split("+")[0]}@${d}`; };
+const baseAddr = mailboxKey;
 
 /** Link a reply to its RFQ: first by Gmail thread, then by the [VIN-RFQ-####] token in the subject.
  *  A From header is not proof of who sent the mail. We attribute a reply (case, RFQ, vendor) only when
@@ -146,7 +151,8 @@ async function matchRfq(mail: ParsedMail, threadId: string | null, subject: stri
     ((await db.from("rfq_recipients").select("vendor_id, email").eq("rfq_id", rfqId)).data ?? []) as { vendor_id: string; email: string | null }[];
   // The vendor must be a recipient of this RFQ, and the sender must be that recipient's mailbox.
   const vendorFor = (rows: { vendor_id: string; email: string | null }[]) => {
-    const hits = rows.filter(r => r.email && baseAddr(r.email) === baseAddr(from));
+    const me = baseAddr(from);
+    const hits = me ? rows.filter(r => r.email && baseAddr(r.email) === me) : [];
     return new Set(hits.map(h => h.vendor_id)).size === 1 ? hits[0].vendor_id : null; // several vendors share one mailbox: ambiguous
   };
 
@@ -155,7 +161,8 @@ async function matchRfq(mail: ParsedMail, threadId: string | null, subject: stri
     if (data) {
       // A thread we started names the vendor, so shared mailboxes are not ambiguous here.
       // The sender must still be that recipient. Another sender in the thread stays unmatched.
-      if (!data.email || baseAddr(data.email) !== baseAddr(from)) return null;
+      const me = baseAddr(from);
+      if (!me || !data.email || baseAddr(data.email) !== me) return null;
       return { rfqId: data.rfq_id as string, vendorId: data.vendor_id as string, caseId: (data as any).rfqs.case_id as string };
     }
   }
@@ -165,7 +172,8 @@ async function matchRfq(mail: ParsedMail, threadId: string | null, subject: stri
     if (rfq) {
       const rows = await recipientsOf(rfq.id);
       // A subject token alone proves nothing. The sender must be a recipient of this RFQ.
-      if (!rows.some(r => r.email && baseAddr(r.email) === baseAddr(from))) return null;
+      const me = baseAddr(from);
+      if (!me || !rows.some(r => r.email && baseAddr(r.email) === me)) return null;
       return { rfqId: rfq.id as string, vendorId: vendorFor(rows), caseId: rfq.case_id as string };
     }
   }
