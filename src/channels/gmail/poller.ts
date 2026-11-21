@@ -5,6 +5,7 @@ import { emit } from "../../lib/steps";
 import { gmailFor } from "./client";
 import { splitQuoted } from "./quoted";
 import { dmarcPassDomain, mailboxKey, parseAddr } from "./auth-results";
+import { senderAllowed } from "./allow";
 
 const BUCKET = process.env.STORAGE_BUCKET || "documents";
 const QUOTE_TYPES = /pdf|spreadsheet|excel|csv|image\//i;
@@ -69,12 +70,14 @@ async function importMessage(userId: string, gmailId: string): Promise<boolean> 
 /** Store and parse one raw mail. No Gmail calls here, so tests can feed any .eml. */
 export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; threadId: string | null; eml: Buffer }): Promise<boolean> {
   const db = admin();
-  // Store the raw mail first, then parse it.
+  const mail = await simpleParser(eml);
+  // Mail from other senders is not stored at all. A mailbox can hold personal mail, and stored text goes to triage and search.
+  if (!(await senderAllowed(addr(mail.from)[0] ?? null))) return false;
+  // Store the raw mail first, then use it.
   const rawPath = `mail/${gmailId}.eml`;
   const up = await db.storage.from(BUCKET).upload(rawPath, eml, { contentType: "message/rfc822", upsert: true });
   if (up.error) throw new Error(`could not store raw mail: ${up.error.message}`);
 
-  const mail = await simpleParser(eml);
   const subject = mail.subject ?? "";
   const from = addr(mail.from)[0] ?? null;
   const recipients = [...addr(mail.to), ...addr(mail.cc)];

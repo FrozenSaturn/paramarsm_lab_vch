@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { admin } from "@/lib/supabase";
 import { getUser, requireRole, VIEW_AS_COOKIE } from "@/lib/auth";
+import { WhatsAppLink } from "./WhatsAppLink";
 import { pollMailbox } from "@/channels/gmail/poller";
 
 const ROLES = ["contracts_engineer", "hod", "site_engineer", "management", "admin"] as const;
@@ -22,9 +23,10 @@ export async function MailboxPanel() {
     revalidatePath("/settings");
   }
   return (
-    <div>
+    <div className="stack" style={{ gap: 12 }}>
       <p>Gmail token: <b>{tok ? "saved" : "missing. Sign out and sign in again with Google."}</b>{tok ? ` (updated ${dt(tok.updated_at)})` : ""}</p>
       <p>Poller on this machine: <b>{flag(process.env.RUN_INGEST)}</b> (only one machine may run it). Last poll: {dt(last?.finished_at)}{last ? ` ${JSON.stringify(last.output)}` : ""}</p>
+      <p>Mail from other senders is {process.env.GMAIL_ALLOW_SENDERS === undefined ? <b>not filtered: every mail is stored. Set GMAIL_ALLOW_SENDERS.</b> : <b>ignored (not stored)</b>}.</p>
       {(user?.role === "contracts_engineer" || user?.role === "admin") && <form action={pollNow}><button>Poll Gmail now</button></form>}
     </div>
   );
@@ -38,7 +40,7 @@ export async function UsersPanel() {
   const [{ data: allowed }, { data: profiles }] = await Promise.all([db.from("allowed_users").select("email, role").order("role"), db.from("profiles").select("email")]);
   const signedIn = new Set((profiles ?? []).map(p => p.email.toLowerCase()));
   return (
-    <table cellPadding={4}>
+    <table>
       <thead><tr><th align="left">Email</th><th align="left">Role</th><th align="left">Signed in before</th></tr></thead>
       <tbody>{(allowed ?? []).map(u => <tr key={u.email}><td>{u.email}</td><td>{u.role.replace(/_/g, " ")}</td><td>{signedIn.has(u.email.toLowerCase()) ? "yes" : "no"}</td></tr>)}</tbody>
     </table>
@@ -60,9 +62,10 @@ export async function ViewAsPanel() {
     revalidatePath("/", "layout");
   }
   return (
-    <form action={setView}>
-      <label>View as <select name="role" defaultValue={user.role}>{ROLES.map(r => <option key={r} value={r}>{r.replace(/_/g, " ")}{r === "admin" ? " (normal)" : ""}</option>)}</select></label> <button>Apply</button>
-      <p style={{ opacity: 0.7, margin: "4px 0 0" }}>Currently: {user.role.replace(/_/g, " ")}.</p>
+    <form action={setView} className="form">
+      <div className="field"><label>View as</label><select name="role" defaultValue={user.role}>{ROLES.map(r => <option key={r} value={r}>{r.replace(/_/g, " ")}{r === "admin" ? " (normal)" : ""}</option>)}</select></div>
+      <div className="actions"><button className="btn-primary">Apply</button></div>
+      <p className="muted" style={{ margin: "12px 0 0" }}>Currently: {user.role.replace(/_/g, " ")}.</p>
     </form>
   );
 }
@@ -77,8 +80,8 @@ export function PolicyPanel() {
   ];
   return (
     <>
-      <table cellPadding={4}><tbody>{rows.map(([a, p]) => <tr key={a}><td>{a}</td><td>{p}</td></tr>)}</tbody></table>
-      <p style={{ opacity: 0.8 }}>
+      <table><tbody>{rows.map(([a, p]) => <tr key={a}><td>{a}</td><td>{p}</td></tr>)}</tbody></table>
+      <p className="muted" style={{ margin: "16px 0 0" }}>
         Item-code judge: {process.env.CODE_JUDGE === "rules" || !process.env.ANTHROPIC_API_KEY ? "rules only" : `rules + ${process.env.CODE_JUDGE_MODEL || "claude-sonnet-5-5"}`} ·
         Triage model: {process.env.TRIAGE_MODEL || "claude-haiku-5-5"} · Mail dry run: {flag(process.env.MAIL_DRY_RUN)} ·
         Reminder after {Number(process.env.REMINDER_AFTER_MINUTES ?? 72 * 60)} min · Events start workflows: {flag(process.env.EMIT_DISPATCHES_TO_INNGEST, "yes", "no")}
@@ -92,6 +95,8 @@ export async function WhatsAppPanel() {
   const { health, status } = await import("@/channels/whatsapp/bridge");
   const { knownNumbers } = await import("@/channels/whatsapp/numbers");
   const configured = !!process.env.WHATSAPP_BRIDGE_TOKEN;
+  const me = await getUser();
+  const canLink = me?.role === "contracts_engineer" || me?.role === "admin";
   const db = admin();
   const [h, st, nums, { data: conn }, { data: lastMsg }] = await Promise.all([
     configured ? health() : Promise.resolve(null), configured ? status() : Promise.resolve(null), knownNumbers(),
@@ -102,7 +107,8 @@ export async function WhatsAppPanel() {
   return (
     <div>
       <p>Bridge: <b>{h?.ok ? "reachable" : `not reachable${h?.error ? ` (${h.error})` : ""}`}</b>{h?.ok ? ` · Evolution: ${h.evolution ? "up" : "down"}` : ""}</p>
-      <p>Phone link: <b>{st?.error ? `unknown (${st.error})` : st?.state ?? "unknown"}</b>{st?.owner ? ` · number ${st.owner}` : ""}. To link or re-link a phone, run <code>npm run wa -- link</code> in <code>services/whatsapp</code>, or open its link page.</p>
+      <p>Phone link: <b>{st?.error ? `unknown (${st.error})` : st?.state ?? "unknown"}</b>{st?.owner ? ` · number ${st.owner}` : ""}</p>
+      {canLink && <WhatsAppLink initialState={st?.state} />}
       <p>Allow-listed numbers: <b>{new Set(nums.map(n => n.number)).size}</b> ({nums.filter(n => n.who === "person").length} site, {nums.filter(n => n.who === "vendor").length} vendor, {nums.filter(n => n.who === "env").length} from <code>WHATSAPP_ALLOW_NUMBERS</code>). Messages from other numbers are dropped and not stored.</p>
       <p>Last inbound message: {dt(lastMsg?.created_at)} · Last link change: {conn ? `${(conn.output as any)?.state} at ${dt(conn.finished_at)}` : "none seen"}</p>
       <p style={{ opacity: 0.7 }}>Voice notes are stored but not transcribed yet. RFQs go by email, not WhatsApp.</p>

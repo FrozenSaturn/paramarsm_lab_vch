@@ -15,7 +15,15 @@ export async function runBoqCheck(opts: { caseId: string; documentId: string; re
   const file = await db.storage.from(BUCKET).download(doc.storage_path);
   if (file.error || !file.data) throw new Error(`could not read ${doc.storage_path}: ${file.error?.message}`);
 
-  const parsed = await parseBoq(Buffer.from(await file.data.arrayBuffer()));
+  let parsed;
+  try { parsed = await parseBoq(Buffer.from(await file.data.arrayBuffer())); }
+  catch (e: any) {
+    // A file that is not a BOQ (for example a vendor list) is not a crash. Record it, so the case page shows why.
+    const error = String(e?.message ?? e);
+    await logStep({ caseId: cs.id, workflow: "W1", step: "BOQ check", status: "failed", input: { document: doc.filename },
+      reasoning: `"${doc.filename}" could not be read as a BOQ: ${error} Send the BOQ sheet, then use "Read as the BOQ".` });
+    return { failed: true as const, error };
+  }
   const findings = checkBoq(parsed, opts.requirementText ?? "");
 
   const { data: last } = await db.from("boq_versions").select("version").eq("case_id", cs.id).order("version", { ascending: false }).limit(1).maybeSingle();

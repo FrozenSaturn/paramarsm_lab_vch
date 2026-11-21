@@ -8,8 +8,8 @@ export const w4Chase = inngest.createFunction(
   { id: "w4-dispatch-chase", name: "W4 Dispatch and chase", triggers: [{ event: "rfq.approved" }], concurrency: { key: "event.data.case_id", limit: 1 } },
   async ({ event, step }) => {
     const { rfq_id, case_id } = event.data;
-    const rfq = await step.run("load", async () => (await admin().from("rfqs").select("due_date").eq("id", rfq_id).single()).data);
-    if (!rfq?.due_date) return { skipped: "no due date" };
+    const rfq = await step.run("load", async () => (await admin().from("rfqs").select("due_date").eq("id", rfq_id).maybeSingle()).data);
+    if (!rfq?.due_date) return { skipped: "the RFQ is gone or has no due date" };
     const { dueAt, reminderAt } = planChase(new Date(), rfq.due_date);
     let reminders = 0;
     if (reminderAt) {

@@ -83,6 +83,7 @@ This list is the state of `main`.
   - The sender check ignores case. It ignores a `+tag` only for `gmail.com` and `googlemail.com`. An address with more than one `@`, or with quotes or spaces, never matches. If several vendors share one mailbox and no thread names the vendor, the vendor stays empty and no `quote.received` is sent.
   - A failed attachment removes the message row, so the next poll starts again. Events go out only after everything is stored. If one message keeps failing, the poller logs a failed step in `agent_steps` and continues with the other mail.
   - The unique index on `(case_id, sha256)` ignores a file that is already stored in the same case. Such a file sends no new events.
+  - **Allowed senders only.** The poller stores a mail only when the sender is a site person or vendor contact in the database, or is in `GMAIL_ALLOW_SENDERS` (`src/channels/gmail/allow.ts`). Other mail is not stored, because a mailbox can hold personal mail and stored text goes to triage (Claude) and search. If `GMAIL_ALLOW_SENDERS` is not set at all, every sender is allowed: always set it.
   - It saves attachments to Storage and `documents`. It skips a mail that is already stored.
   - It emits `message.stored`, `document.stored` and `quote.received`. The `quote.received` event needs a known RFQ and vendor.
   - The classification `vendor_reply` is a rule for now. Triage (W0) will replace it.
@@ -92,6 +93,7 @@ This list is the state of `main`.
   - `parse.ts` reads a BOQ sheet cell by cell. It finds the header row, the unit column, the quantity column and the part columns. It works on the Amara and the Aquina sheets.
   - `check.ts` runs these checks: not measured, quantity not more than zero, no unit, unknown unit, parts do not add up to the total, sqm and sqft disagree, duplicate serial, duplicate description, grand total, and (with the site message) no dates and no scope.
   - `clarificationDraft` writes a plain message to site from the findings.
+  - A file that is not a BOQ does not crash. `runBoqCheck` records a failed step with the reason and returns `{ failed: true }`. The case page shows it in Agent activity.
   - `pipeline.ts` (`runBoqCheck`) saves a new `boq_versions` row and the lines, saves each finding in `extracted_fields` (entity `boq_version`), and proposes a `send_clarification` action. The `send_clarification` action uses the same handler as `send_email`.
   - Pages: `/dev/boq` (upload a sheet), `/cases/[id]/boq` (checks, lines, editable clarification, Accept BOQ). Accept BOQ emits `boq.accepted`.
 - **Item-code mapping (W2).** Code is in `src/codes/` and `src/erp/`.
