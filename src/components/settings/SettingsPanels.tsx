@@ -30,7 +30,10 @@ export async function MailboxPanel() {
   );
 }
 
+/** The list of sign-in emails and roles is for admins. The table's own policy says the same. We read it with the service key, so we check here. */
 export async function UsersPanel() {
+  const user = await getUser();
+  if (user?.role !== "admin") return <p>Only an admin can see the users and their roles.</p>;
   const db = admin();
   const [{ data: allowed }, { data: profiles }] = await Promise.all([db.from("allowed_users").select("email, role").order("role"), db.from("profiles").select("email")]);
   const signedIn = new Set((profiles ?? []).map(p => p.email.toLowerCase()));
