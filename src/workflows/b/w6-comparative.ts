@@ -4,6 +4,7 @@ import { logStep } from "@/lib/steps";
 import type { EventMap } from "@/contracts/events";
 import { liveQuoteRows } from "@/compare/load";
 import { runComparative, W6 } from "@/compare/run";
+import { buildRecommendation } from "@/compare/recommend";
 import { decideOnDueDate, decideOnQuote, type TriggerDecision } from "@/compare/triggers";
 
 /** Vendors the RFQ went to (sent_at set). The RFQ is the quote's, else the case's newest sent RFQ. */
@@ -38,7 +39,8 @@ async function decide(name: string, data: any): Promise<TriggerDecision> {
 /**
  * W6 Comparative: builds a new comparative version when all invited vendors have quoted,
  * when a revised quote arrives, or when the due date passes with three or more quotes.
- * Fewer than three at the due date raises an alert. One case at a time, so two quotes
+ * Fewer than three at the due date raises an alert. After each comparative it writes the
+ * recommendation and proposes `notify_hod`. One case at a time, so two quotes
  * landing together cannot race on the version number.
  */
 export const w6Comparative = inngest.createFunction(
@@ -65,6 +67,11 @@ export const w6Comparative = inngest.createFunction(
       const r = await runComparative({ caseId, trigger: d.trigger, actor: W6 });
       return { comparative_id: r.comparativeId, version: r.version, inputs_hash: r.inputsHash };
     });
-    return { ran: true, trigger: d.trigger, ...out };
+    // A separate step: a model or network failure here retries only the recommendation, not the comparative.
+    const rec = await step.run("build recommendation", async () => {
+      const r = await buildRecommendation({ comparativeId: out.comparative_id, actor: W6 });
+      return { recommendation_id: r.recommendationId, notify_action_id: r.notifyActionId, withheld: r.withheld, source: r.source };
+    });
+    return { ran: true, trigger: d.trigger, ...out, ...rec };
   },
 );
