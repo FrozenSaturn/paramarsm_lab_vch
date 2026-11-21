@@ -1,0 +1,277 @@
+// OWNER: Person A. Relations stay inside A's models only: A never references B's tables.
+model allowed_users {
+  email   String     @id
+  role    app_role_t
+  is_demo Boolean?   @default(true)
+}
+
+// id equals auth.users.id (FK to auth.users with ON DELETE CASCADE is added in the hand-written migration)
+model profiles {
+  id         String      @id @db.Uuid
+  email      String      @unique
+  role       app_role_t
+  created_at DateTime?   @default(now()) @db.Timestamptz(6)
+  actions         actions[]  @relation("approver")
+  edited_actions  actions[]  @relation("editor")
+  receipts        receipts[]
+  code_aliases    code_aliases[]
+}
+
+model mail_tokens {
+  user_id       String    @id @db.Uuid
+  refresh_token String
+  history_id    String?
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model projects {
+  id      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name    String
+  is_demo Boolean?  @default(true)
+  source  String?
+  people  people[]
+  cases   cases[]
+}
+
+model people {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  title      String?
+  project_id String?   @db.Uuid
+  email      String?
+  phone      String?
+  is_demo    Boolean?  @default(true)
+  source     String?
+  project    projects? @relation(fields: [project_id], references: [id])
+}
+
+model vendors {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  gstin      String?
+  address    String?
+  is_demo    Boolean?  @default(true)
+  source     String?
+  contacts   vendor_contacts[]
+  categories vendor_categories[]
+  recipients rfq_recipients[]
+}
+
+model vendor_contacts {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendor_id String   @db.Uuid
+  name      String?
+  email     String?
+  phone     String?
+  vendor    vendors  @relation(fields: [vendor_id], references: [id])
+}
+
+model vendor_categories {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendor_id String   @db.Uuid
+  category  String
+  inferred  Boolean? @default(false)
+  vendor    vendors  @relation(fields: [vendor_id], references: [id])
+}
+
+model cases {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id String?   @db.Uuid
+  title      String
+  stage      String    @default("requirement")
+  status     String    @default("open")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  is_demo    Boolean?  @default(true)
+  project    projects? @relation(fields: [project_id], references: [id])
+  messages   messages[]
+  documents  documents[]
+  boq_versions boq_versions[]
+  code_proposals code_proposals[]
+  rfqs       rfqs[]
+  actions    actions[]
+  agent_steps agent_steps[]
+}
+
+model messages {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id     String?   @db.Uuid
+  channel     String
+  direction   String    @default("in")
+  external_id String?   @unique
+  thread_id   String?
+  sender      String?
+  recipients  String[]
+  subject     String?
+  body        String?
+  body_en     String?
+  language    String?
+  classification String?
+  raw_path    String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  case        cases?    @relation(fields: [case_id], references: [id])
+  documents   documents[]
+}
+
+model documents {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id      String?   @db.Uuid
+  message_id   String?   @db.Uuid
+  filename     String?
+  mime         String?
+  storage_path String
+  sha256       String?
+  kind         String?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  case         cases?    @relation(fields: [case_id], references: [id])
+  message      messages? @relation(fields: [message_id], references: [id])
+  boq_versions boq_versions[]
+}
+
+model boq_versions {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id            String    @db.Uuid
+  version            Int
+  status             String?   @default("draft")
+  source_document_id String?   @db.Uuid
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  case               cases     @relation(fields: [case_id], references: [id])
+  source_document    documents? @relation(fields: [source_document_id], references: [id])
+  lines              boq_lines[]
+  @@unique([case_id, version])
+}
+
+model boq_lines {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  boq_version_id String   @db.Uuid
+  serial         String?
+  description    String
+  unit           String?
+  quantity       Decimal?
+  item_code      String?
+  flags          Json?    @default("[]")
+  boq_version    boq_versions @relation(fields: [boq_version_id], references: [id])
+  code_proposals code_proposals[]
+}
+
+model item_codes {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String
+  description     String
+  unit            String?
+  erp_serial      Int?
+  normalized_code String?
+  embedding       Unsupported("vector(384)")?
+  is_demo         Boolean? @default(true)
+  source          String?
+  aliases         code_aliases[]
+}
+
+model code_aliases {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alias_text   String
+  item_code_id String    @db.Uuid
+  confirmed_by String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  item_code    item_codes @relation(fields: [item_code_id], references: [id])
+  confirmer    profiles?  @relation(fields: [confirmed_by], references: [id])
+}
+
+model code_proposals {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id       String?  @db.Uuid
+  boq_line_id   String?  @db.Uuid
+  proposed_code String?
+  description   String?
+  nearest       Json?
+  status        String?  @default("proposed")
+  case          cases?     @relation(fields: [case_id], references: [id])
+  boq_line      boq_lines? @relation(fields: [boq_line_id], references: [id])
+}
+
+model rfqs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id    String    @db.Uuid
+  ref        String?   @unique
+  due_date   DateTime? @db.Date
+  terms      Json?
+  status     String?   @default("draft")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  case       cases     @relation(fields: [case_id], references: [id])
+  recipients rfq_recipients[]
+}
+
+model rfq_recipients {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rfq_id          String    @db.Uuid
+  vendor_id       String    @db.Uuid
+  email           String?
+  gmail_thread_id String?
+  gmail_draft_id  String?
+  sent_at         DateTime? @db.Timestamptz(6)
+  reminders_sent  Int?      @default(0)
+  status          String?   @default("draft")
+  rfq             rfqs      @relation(fields: [rfq_id], references: [id])
+  vendor          vendors   @relation(fields: [vendor_id], references: [id])
+}
+
+model actions {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id          String?   @db.Uuid
+  kind             String
+  status           String    @default("proposed") // proposed|edited|approved|executed|rejected|failed (CHECK in raw SQL)
+  payload          Json
+  original_payload Json?
+  proposed_by      String?
+  approved_by      String?   @db.Uuid
+  edited_by        String?   @db.Uuid
+  approved_at      DateTime? @db.Timestamptz(6)
+  reject_reason    String?
+  error            String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  case             cases?    @relation(fields: [case_id], references: [id])
+  approver         profiles? @relation("approver", fields: [approved_by], references: [id])
+  editor           profiles? @relation("editor", fields: [edited_by], references: [id])
+  receipts         receipts[]
+}
+
+model receipts {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action_id    String    @db.Uuid
+  payload_hash String
+  payload      Json
+  approved_by  String?   @db.Uuid
+  approved_at  DateTime? @db.Timestamptz(6)
+  executed_at  DateTime? @default(now()) @db.Timestamptz(6)
+  provider_id  String?
+  result       Json?
+  action       actions   @relation(fields: [action_id], references: [id])
+  approver     profiles? @relation(fields: [approved_by], references: [id])
+}
+
+model events {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  case_id    String?   @db.Uuid
+  payload    Json      @default("{}")
+  actor      String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model agent_steps {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id        String?   @db.Uuid
+  workflow       String?
+  step           String
+  status         String?   @default("running")
+  input          Json?
+  output         Json?
+  model          String?
+  prompt_version String?
+  evidence       Json?
+  reasoning      String?
+  cost_usd       Decimal?
+  started_at     DateTime? @default(now()) @db.Timestamptz(6)
+  finished_at    DateTime? @db.Timestamptz(6)
+  case           cases?    @relation(fields: [case_id], references: [id])
+}

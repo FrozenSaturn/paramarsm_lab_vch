@@ -94,7 +94,7 @@ Three rules from the problem statement are built in as hard constraints, not con
 | Layer | Choice | Notes |
 | --- | --- | --- |
 | App and API | Next.js, TypeScript | One language across UI, API, workflows and the WhatsApp webhook |
-| Database | Supabase Postgres (free tier) | Schema kept as SQL migrations in the repo and applied with the Supabase CLI, so both builders share one project. Free projects are limited to 500 MB and pause after a week without activity |
+| Database | Supabase Postgres (free tier) | Schema kept as Prisma models (split per owner in `prisma/schema/`) with migrations applied by Prisma Migrate; RLS, triggers and special indexes are hand-written SQL in their own migration. The Supabase CLI runs the local stack (auth, storage, realtime). Free projects are limited to 500 MB and pause after a week without activity |
 | Sign-in | Supabase Auth, Google provider | One Google Cloud OAuth client in testing mode with both builders added as test users |
 | Access control | Row-level security driven by a `profiles.role` column | Section 9 |
 | Files | Supabase Storage, one private bucket, signed URLs | Chosen over MinIO: one less container, and the same access rules as the database. Free tier is 1 GB |

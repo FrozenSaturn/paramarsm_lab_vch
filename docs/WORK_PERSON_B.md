@@ -11,10 +11,10 @@ You own everything from "a quote file arrives" to "the HOD decides", plus the cr
 ## 2. Ground rules (identical in A's file)
 
 1. **Own folders, own tables.** You may edit only the paths in section 3. To change anything of A's, open an issue labelled `for-A`. Don't "just fix it".
-2. **Frozen contract.** After Day 0 the files in `src/contracts/` and `supabase/migrations/0000_contract.sql` change only by a PR the other person approves. This covers event names, payload shapes, the `actions` row, table columns used by both sides, and the `getContext` signature.
+2. **Frozen contract.** After Day 0 the files in `src/contracts/` and `prisma/schema/base.prisma` and the first two migrations in `prisma/migrations/` change only by a PR the other person approves. This covers event names, payload shapes, the `actions` row, table columns used by both sides, and the `getContext` signature.
 3. **Talk through events, not imports.** If your code needs something the other person builds, it waits for an event or calls a function whose signature is in `src/contracts/`. Never import from the other person's folder.
 4. **Own database, own machine.** Each of you runs a local Supabase (`supabase start`) and a local Inngest dev server. The shared cloud Supabase project is for integration runs and the demo only. Reset your local database whenever you like.
-5. **Migrations don't collide.** After `0000`, A's files are numbered `1xxx_*.sql` and B's `2xxx_*.sql`. A table has one owner and only the owner writes migrations for it. Cross-table foreign keys point from B's tables to A's, never the other way.
+5. **Migrations don't collide (Prisma Migrate).** The schema is split into `prisma/schema/base.prisma` (shared, frozen), `a.prisma` (A) and `b.prisma` (B). Only the owner edits their file. B's models refer to A's tables by plain uuid columns with **no Prisma relation and no foreign key**, so A's file never needs a back-relation from B; A's models never refer to B's. To change your tables: edit your `.prisma` file, run `npm run db:migrate -- --name <what>` (this is `prisma migrate dev --create-only`), read the generated SQL, delete any line that drops an hnsw, trigram or partial index or a CHECK (Prisma cannot see them), then `npm run db:deploy`. **Rebase on `main` before generating, and merge the migration PR the same day**, because migration folders are ordered by timestamp. Policies, triggers and functions go in a hand-written migration of your own, never into someone else's.
 6. **One ingester.** `RUN_INGEST=true` only on A's machine. Yours is always `false`. Otherwise every Gmail message is processed twice.
 7. **Shared files are append-only and tiny:** `package.json` (add your own dependencies; whoever merges second re-runs `npm install`), `.env.example` (each person has a marked section) and `CODEOWNERS`. Merge those PRs the same day.
 8. **Branches.** `a/<topic>` and `b/<topic>`. Small PRs into `main`, rebase on `main` at least twice a day, the other person only skims. `CODEOWNERS` makes GitHub enforce the folder rule.
@@ -26,7 +26,7 @@ You own everything from "a quote file arrives" to "the HOD decides", plus the cr
 
 | Path | Contents |
 | --- | --- |
-| `supabase/migrations/2*` | Your tables' changes after Day 0 |
+| `prisma/schema/b.prisma` | Your models. Your migrations are generated from it |
 | `src/app/`: `approvals`, `vendors`, `audit`, `search`, `dev/quotes` | Your screens |
 | `src/components/case/b/` | Case panels that are yours (below) |
 | `src/workflows/b/`, `src/agents/b/` | W5 to W7, indexing and memory functions, and their prompts |
@@ -158,7 +158,7 @@ Touch `messages`, `documents` or `cases` rows except to read them, send mail or 
 3. Write `.env.example` with a section each, and the Inngest serve route that merges `workflows/a/index.ts` and `workflows/b/index.ts`.
 4. Add the stub `src/context/index.ts` returning empty results.
 
-**A does** (you review): the repo skeleton, `0000_contract.sql` (check every column you will read or write), `CODEOWNERS`, the case-page frame and nav that import `case/a/tabs.ts`, `case/b/tabs.ts`, `nav.a.ts` and `nav.b.ts`.
+**A does** (you review): the repo skeleton, `prisma/schema/*.prisma` (check every column you will read or write), `CODEOWNERS`, the case-page frame and nav that import `case/a/tabs.ts`, `case/b/tabs.ts`, `nav.a.ts` and `nav.b.ts`.
 
 **Agree together, then freeze:** event names and payloads, the `actions` row, the `getContext` signature, and which of you hosts the shared Supabase project.
 

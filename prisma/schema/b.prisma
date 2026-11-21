@@ -1,0 +1,139 @@
+// OWNER: Person B. References to A's tables are plain uuid columns with NO Prisma relation, so
+// A's model file never needs a back-relation from B. Integrity is checked in code; add indexes here.
+model extracted_fields {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type  String
+  entity_id    String    @db.Uuid
+  field        String
+  value        Json?
+  document_id  String?   @db.Uuid
+  page         Int?
+  snippet      String?
+  confidence   Decimal?
+  confirmed_by String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  @@index([entity_type, entity_id])
+}
+
+model doc_chunks {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document_id String?  @db.Uuid
+  message_id  String?  @db.Uuid
+  case_id     String?  @db.Uuid
+  page        Int?
+  content     String
+  embedding   Unsupported("vector(384)")?
+  @@index([case_id])
+}
+
+model vendor_performance {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendor_id         String    @db.Uuid
+  case_id           String?   @db.Uuid
+  quality           Int?
+  timeliness        Int?
+  disputes          Int?
+  safety            Int?
+  note              String?
+  source_message_id String?   @db.Uuid
+  confirmed_by      String?   @db.Uuid
+  is_demo           Boolean?  @default(true)
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  @@index([vendor_id])
+}
+
+model memory_refs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mem0_id    String
+  entity     String
+  message_id String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model quotes {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id        String    @db.Uuid
+  rfq_id         String?   @db.Uuid
+  vendor_id      String    @db.Uuid
+  document_id    String?   @db.Uuid
+  version        Int?      @default(1)
+  quote_date     DateTime? @db.Date
+  reference      String?
+  validity       String?
+  gst_treatment  String?
+  freight        String?
+  payment_terms  String?
+  advance        String?
+  completion_time String?
+  warranty       String?
+  status         String?   @default("extracting")
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  lines          quote_lines[]
+  terms          quote_terms[]
+  @@index([case_id])
+}
+
+model quote_lines {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quote_id        String   @db.Uuid
+  boq_line_id     String?  @db.Uuid
+  unit            String?
+  quantity        Decimal?
+  rate            Decimal?
+  amount          Decimal?
+  make            String?
+  normalized_rate Decimal?
+  flags           Json?    @default("[]")
+  quote           quotes   @relation(fields: [quote_id], references: [id])
+}
+
+model quote_terms {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quote_id String  @db.Uuid
+  term     String
+  status   String  // met|not_met|not_stated (CHECK in raw SQL)
+  detail   String?
+  quote    quotes  @relation(fields: [quote_id], references: [id])
+}
+
+model comparatives {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id    String    @db.Uuid
+  version    Int
+  matrix     Json
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  scores           scores[]
+  recommendations  recommendations[]
+  @@unique([case_id, version])
+}
+
+model scores {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comparative_id String   @db.Uuid
+  vendor_id      String   @db.Uuid
+  total          Decimal?
+  breakdown      Json?
+  flags          Json?
+  comparative    comparatives @relation(fields: [comparative_id], references: [id])
+}
+
+model recommendations {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comparative_id String    @db.Uuid
+  ranking        Json?
+  explanation    Json?
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  comparative    comparatives @relation(fields: [comparative_id], references: [id])
+  decisions      decisions[]
+}
+
+model decisions {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recommendation_id String    @db.Uuid
+  vendor_id         String    @db.Uuid
+  decided_by        String    @db.Uuid
+  overridden        Boolean?  @default(false)
+  reason            String?
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  recommendation    recommendations @relation(fields: [recommendation_id], references: [id])
+}
