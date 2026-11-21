@@ -85,7 +85,7 @@ export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; t
 
   const { data: msg, error } = await db.from("messages").insert({
     case_id: match?.caseId ?? null, channel: "email", direction: "in", external_id: gmailId, thread_id: threadId,
-    sender: from, recipients, subject, body: latest, raw_path: rawPath,
+    sender: from, recipients, subject, body: latest, raw_path: rawPath, sender_verified: senderAuthenticated(mail),
     classification: match ? "vendor_reply" : (/\[VIN-RFQ-\d+\]/i.test(subject) ? "unverified_reply" : null), // rule-based until triage (W0) classifies with a model. An RFQ token without a passed sender check needs a person.
   }).select("id").single();
   if (error) {
@@ -99,6 +99,8 @@ export async function ingestRaw({ gmailId, threadId, eml }: { gmailId: string; t
   // Events go out only after everything is stored.
   const opts = { caseId: match?.caseId, actor: "gmail-poller" };
   const events: (() => Promise<void>)[] = [() => emit("message.stored", { message_id: msg.id, case_id: match?.caseId }, opts)];
+  // Triage (W0) reads every inbound message that no RFQ reply rule has already claimed.
+  if (!match) events.push(() => emit("message.received", { message_id: msg.id }, opts));
   try {
     for (const a of mail.attachments) {
       if (a.contentDisposition === "inline" && !a.filename) continue; // signature images

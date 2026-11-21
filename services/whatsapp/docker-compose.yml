@@ -1,0 +1,99 @@
+# WhatsApp microservice: Evolution API (WhatsApp Web link) + bridge (webhook, store, read/send API).
+# Only the bridge and the Evolution API bind a host port, and only on 127.0.0.1.
+name: vch-whatsapp
+
+services:
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${EVOLUTION_PORT:-8080}:8080"
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: "8080"
+      SERVER_URL: http://localhost:${EVOLUTION_PORT:-8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?set EVOLUTION_API_KEY in .env}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "false"
+      TELEMETRY_ENABLED: "false"
+      LANGUAGE: en
+      LOG_LEVEL: ERROR,WARN,INFO
+      LOG_BAILEYS: error
+      DEL_INSTANCE: "false"
+      CONFIG_SESSION_PHONE_CLIENT: VCH Procurement
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: "30"
+      # Evolution keeps chats, contacts and the history sync in its own database.
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-postgres:5432/evolution?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: vch_whatsapp
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+      # The bridge sets one webhook for each instance. No global webhook.
+      WEBHOOK_GLOBAL_ENABLED: "false"
+      WEBHOOK_REQUEST_TIMEOUT_MS: "60000"
+    volumes:
+      - evolution_instances:/evolution/instances
+
+  evolution-postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+    volumes:
+      - evolution_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  evolution-redis:
+    image: redis:7
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis:/data
+
+  bridge:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - evolution
+    ports:
+      - "127.0.0.1:${BRIDGE_PORT:-8091}:8091"
+    environment:
+      BRIDGE_PORT: "8091"
+      BRIDGE_TOKEN: ${BRIDGE_TOKEN:?set BRIDGE_TOKEN in .env}
+      EVOLUTION_URL: http://evolution:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      WEBHOOK_URL: http://bridge:8091/webhook/evolution
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?set WEBHOOK_SECRET in .env}
+      INSTANCE_NAME: ${INSTANCE_NAME:-vch-main}
+      DATA_DIR: /app/data
+      FORWARD_URL: ${FORWARD_URL:-}
+      FORWARD_TOKEN: ${FORWARD_TOKEN:-}
+      ALLOW_NUMBERS: ${ALLOW_NUMBERS:-}
+    volumes:
+      - ./data:/app/data:z
+
+volumes:
+  evolution_instances:
+  evolution_pg:
+  evolution_redis:

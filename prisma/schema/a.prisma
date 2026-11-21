@@ -107,6 +107,7 @@ model messages {
   language    String?
   classification String?
   raw_path    String?
+  sender_verified Boolean @default(false)
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
   case        cases?    @relation(fields: [case_id], references: [id])
   documents   documents[]
