@@ -65,6 +65,8 @@ export async function seedVendors(db: pg.Client) {
   const ids: Record<string, string> = {};
   for (const v of QUOTING) {
     const id = ids[v.slug] = await upsert(db, "vendors", { name: v.name }, { gstin: v.gstin, address: v.address, source: v.source, is_demo: true });
+    // One seeded contact per vendor: a changed VENDOR_MAILBOX replaces the old address.
+    await db.query(`delete from vendor_contacts where vendor_id = $1 and email <> $2`, [id, vendorEmail(v.slug)]);
     await upsert(db, "vendor_contacts", { vendor_id: id, email: vendorEmail(v.slug) }, { name: v.name });
     // They quoted waterproofing, so this is a fact from the quote, not a guess.
     await upsert(db, "vendor_categories", { vendor_id: id, category: "waterproofing" }, { inferred: false });
