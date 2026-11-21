@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 async function propose() {
   "use server";
   if (process.env.NODE_ENV === "production") notFound();
-  await requireRole("admin");
-  await proposeAction("send_whatsapp", null, { to: "demo", text: "hello" }, { proposedBy: "dev" });
+  const user = await requireRole("admin");
+  // A dummy mail to yourself. With MAIL_DRY_RUN=true nothing is sent.
+  await proposeAction("send_email", null, { to: [user.email], subject: "Dev test of the approval path", body: "This is a dummy mail." }, { proposedBy: "dev" });
   revalidatePath("/dev/actions");
 }
 export default async function Dev() {

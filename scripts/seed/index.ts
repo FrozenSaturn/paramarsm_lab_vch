@@ -1,5 +1,5 @@
 import { connect } from "./db";
-import { seedUsers, seedProjects, seedVendors, seedItemCodes, seedAmaraBoq, seedPastCases } from "./a/master";
+import { seedUsers, seedProjects, seedVendors, seedItemCodes, seedAmaraBoq, seedPastCases, seedPhones } from "./a/master";
 import { embedItemCodes } from "./a/embed";
 
 const db = await connect();
@@ -13,6 +13,7 @@ try {
   console.log("A: Amara BOQ", await seedAmaraBoq(db, projects["Vinayak Amara"]));
   await seedPastCases(db, projects, v.ids);
   console.log("A: past cases seeded");
+  console.log("A: phone numbers set", await seedPhones(db));
   if (process.env.SKIP_EMBED === "true") console.log("A: embeddings skipped");
   else console.log("A: embedded", await embedItemCodes(db), "item codes");
   // B's seed (vendor performance, memories) is added by B in scripts/seed/b/index.ts

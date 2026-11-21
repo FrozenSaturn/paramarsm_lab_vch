@@ -2,6 +2,7 @@ import { admin } from "../lib/supabase";
 import { logStep } from "../lib/steps";
 import { runBoqCheck } from "../boq/pipeline";
 import { classifyMessage, TRIAGE_PROMPT_VERSION } from "./classify";
+import { findKnown } from "../channels/whatsapp/numbers";
 
 const AUTO_CASE_CONFIDENCE = 0.8;
 const XLSX = /spreadsheet|excel|\.xlsx$/i;
@@ -12,7 +13,7 @@ export interface TriageResult { category: string; confidence: number; caseId: st
  *  Anything else is labelled and left for a person, who can open the case from the Inbox. */
 export async function triageMessage(messageId: string): Promise<TriageResult> {
   const db = admin();
-  const { data: m } = await db.from("messages").select("id, case_id, direction, sender, subject, body, thread_id, sender_verified, classification").eq("id", messageId).single();
+  const { data: m } = await db.from("messages").select("id, case_id, channel, direction, sender, subject, body, thread_id, sender_verified, classification").eq("id", messageId).single();
   if (!m) throw new Error("message not found");
   if (m.direction !== "in") return { category: "outbound", confidence: 1, caseId: m.case_id, action: "labelled", why: "Outbound mail is not triaged." };
   const { data: docs } = await db.from("documents").select("id, filename, mime, storage_path").eq("message_id", m.id);
@@ -24,12 +25,12 @@ export async function triageMessage(messageId: string): Promise<TriageResult> {
   // The sender must also be a participant: a person on that case's project, or an address that already wrote in this thread.
   if (!caseId && m.thread_id && m.sender_verified && m.sender) {
     const { data: t } = await db.from("messages").select("case_id, sender").eq("thread_id", m.thread_id).not("case_id", "is", null).neq("id", m.id);
-    const known = await knownParticipant(m.sender, (t ?? []).map(x => ({ caseId: x.case_id as string, sender: x.sender as string | null })));
+    const known = await knownParticipant(m.channel, m.sender, (t ?? []).map(x => ({ caseId: x.case_id as string, sender: x.sender as string | null })));
     if (known) { caseId = known; action = "linked"; why = `Same thread as an existing case, from a known participant. ${a.reason}`; }
     else if (t?.length) { action = "needs_person"; why = `The thread belongs to a case, but the sender is not a known participant. A person decides. ${a.reason}`; }
   }
   if (!caseId && a.category === "requirement") {
-    const { data: person } = m.sender ? await db.from("people").select("id, project_id").ilike("email", m.sender.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle() : { data: null };
+    const person = await personFor(m.channel, m.sender);
     if (m.sender_verified && person && a.confidence >= AUTO_CASE_CONFIDENCE) {
       caseId = await openCase(m.id, a.case_title || m.subject || "New requirement", person.project_id ?? null);
       action = "case_opened"; why = `Verified mail from a known person asks for work. ${a.reason}`;
@@ -53,12 +54,23 @@ export async function triageMessage(messageId: string): Promise<TriageResult> {
   return { category: a.category, confidence: a.confidence, caseId, action, why };
 }
 
-async function knownParticipant(sender: string, thread: { caseId: string; sender: string | null }[]): Promise<string | null> {
+/** A known site person: by email for mail, by phone number for WhatsApp. */
+export async function personFor(channel: string, sender: string | null): Promise<{ id: string; project_id: string | null } | null> {
+  if (!sender) return null;
+  if (channel === "whatsapp") {
+    const k = await findKnown(sender);
+    return k?.who === "person" ? { id: k.personId!, project_id: k.projectId ?? null } : null;
+  }
+  const { data } = await admin().from("people").select("id, project_id").ilike("email", sender.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle();
+  return data ? { id: data.id, project_id: data.project_id } : null;
+}
+
+async function knownParticipant(channel: string, sender: string, thread: { caseId: string; sender: string | null }[]): Promise<string | null> {
   const db = admin();
   const me = sender.toLowerCase();
   const wrote = thread.find(t => t.sender?.toLowerCase() === me);
   if (wrote) return wrote.caseId;
-  const { data: person } = await db.from("people").select("project_id").ilike("email", me.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle();
+  const person = await personFor(channel, sender);
   if (!person?.project_id) return null;
   for (const t of thread) {
     const { data: c } = await db.from("cases").select("project_id").eq("id", t.caseId).single();

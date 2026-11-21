@@ -123,12 +123,24 @@ This list is the state of `main`.
 - **ERP import sheet.** `src/erp/import-sheet.ts` builds the sheet. The action `erp_import_sheet` writes it to Storage. It never writes to Farvision. The column layout is a placeholder until the client gives the Farvision template. The codes page has the request and the download link.
 - **Settings and "view as".** `src/components/settings/SettingsPanels.tsx` shows the Gmail status, a poll button, the users, the approval policy and the model settings. An admin can use "view as" to show another role's screens. It changes what pages and server actions allow in the app. It adds no rights, and the executor checks the stored role.
 - **Case workspace.** `src/components/case/a/CasePanels.tsx` shows the conversation, the pending actions (approve or reject) and the agent activity. `LiveRefresh.tsx` refreshes the page when the case gets a new step, action or message (Supabase Realtime).
+- **WhatsApp (app side).** B built the bridge in `services/whatsapp` (Evolution API, a webhook, a store, a send API). The app side is in `src/channels/whatsapp/`.
+  - `bridge.ts` is the client for the bridge: health, status, send text, send media, download media. The bridge token stays on the server.
+  - The bridge posts each new message to `POST /api/webhooks/whatsapp` (its `FORWARD_URL`). The route needs `Authorization: Bearer <WHATSAPP_FORWARD_TOKEN>`. It compares the token in constant time.
+  - `ingest.ts` stores a message only when the sender number is on the allow-list: `people.phone`, `vendor_contacts.phone` or `WHATSAPP_ALLOW_NUMBERS`. Other numbers are dropped and not stored. The comparison uses the last 10 digits. Own messages and status updates are skipped.
+  - A stored message has `channel = whatsapp`, `thread_id = chat JID` and `sender_verified = true`. Files go to Storage and `documents`. If a file fails, the message row is removed, so the bridge can send it again.
+  - A vendor file links to an RFQ only when the vendor has exactly one open RFQ, or the message names it (for example `RFQ-0032`). Otherwise a person decides.
+  - A voice note is stored and marked `voice_note`. It is not transcribed and not triaged yet.
+  - Triage finds a known person by phone for WhatsApp, by email for mail (`personFor` in `src/triage/triage.ts`). A BOQ sheet from a known person opens a case. The clarification then goes back over WhatsApp (`send_whatsapp`).
+  - The `send_whatsapp` handler (`src/executor/handlers/a/send-whatsapp.ts`) sends only to an allow-listed number. It limits sends to `WHATSAPP_MAX_PER_HOUR` (default 20). Attachments come from the proposed payload only. `MAIL_DRY_RUN=true` also skips the bridge call. RFQs go by email, not WhatsApp.
+  - The Settings page shows the bridge state, the phone link and the allow-list size.
+  - To start: in `services/whatsapp` run `npm install`, `npm run up`, then `npm run wa -- link` and scan the QR code. Put numbers in `people.phone` with `SEED_PEOPLE_PHONES` and `SEED_VENDOR_PHONES` in `.env`, then run `npm run seed`. On Linux, the bridge needs `extra_hosts: host.docker.internal:host-gateway` to reach the app.
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 
 ## Not built yet (Person A)
 
-- WhatsApp through Evolution API, and Sarvam speech and translation.
+- Sarvam speech to text and translation. Voice notes from WhatsApp are stored but not transcribed.
+- A real phone has not been linked yet. WhatsApp was tested against a stand-in bridge.
 
 ## Decisions
 

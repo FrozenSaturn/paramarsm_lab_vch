@@ -2,7 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { requirePageUser, requireRole } from "@/lib/auth";
 import { admin } from "@/lib/supabase";
-import { openCase, triageMessage } from "@/triage/triage";
+import { openCase, personFor, triageMessage } from "@/triage/triage";
 import { runBoqCheck } from "@/boq/pipeline";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -19,10 +19,10 @@ async function openCaseFromMessage(form: FormData) {
   await requireRole("contracts_engineer", "admin");
   const db = admin();
   const id = String(form.get("id"));
-  const { data: m } = await db.from("messages").select("id, subject, body, case_id, sender, sender_verified").eq("id", id).single();
+  const { data: m } = await db.from("messages").select("id, subject, body, case_id, channel, sender, sender_verified").eq("id", id).single();
   if (!m || m.case_id) return;
   // The project comes from a person record only when the sender is verified. Otherwise the case has no project.
-  const { data: person } = m.sender && m.sender_verified ? await db.from("people").select("project_id").ilike("email", m.sender.replace(/[%_\\]/g, "\\$&")).limit(1).maybeSingle() : { data: null };
+  const person = m.sender_verified ? await personFor(m.channel, m.sender) : null;
   const caseId = await openCase(id, String(form.get("title") || m.subject || "New requirement"), person?.project_id ?? null);
   const { data: docs } = await db.from("documents").select("id, filename, mime").eq("message_id", id);
   const sheet = (docs ?? []).find(d => /spreadsheet|excel|\.xlsx$/i.test(`${d.mime} ${d.filename}`));

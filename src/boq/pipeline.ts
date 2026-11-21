@@ -9,7 +9,7 @@ const BUCKET = process.env.STORAGE_BUCKET || "documents";
 /** W1: read the BOQ sheet, check it, save it as a new version and draft a clarification to site. Nothing is sent here. */
 export async function runBoqCheck(opts: { caseId: string; documentId: string; requirementText?: string }) {
   const db = admin();
-  const { data: doc } = await db.from("documents").select("id, filename, storage_path").eq("id", opts.documentId).single();
+  const { data: doc } = await db.from("documents").select("id, filename, storage_path, message_id").eq("id", opts.documentId).single();
   const { data: cs } = await db.from("cases").select("id, title, project_id").eq("id", opts.caseId).single();
   if (!doc || !cs) throw new Error("document or case not found");
   const file = await db.storage.from(BUCKET).download(doc.storage_path);
@@ -38,9 +38,15 @@ export async function runBoqCheck(opts: { caseId: string; documentId: string; re
   let actionId: string | null = null;
   const draft = clarificationDraft(cs.title, findings);
   if (draft) {
-    const { data: ppl } = await db.from("people").select("email").eq("project_id", cs.project_id ?? "").not("email", "is", null);
-    const a = await proposeAction("send_clarification", cs.id, { to: (ppl ?? []).map(p => p.email as string), ...draft }, { proposedBy: "W1" });
-    actionId = a.id;
+    // Answer on the channel the requirement came in on. A WhatsApp requirement gets a short WhatsApp reply.
+    const { data: src } = doc.message_id ? await db.from("messages").select("channel, sender").eq("id", doc.message_id).maybeSingle() : { data: null };
+    if (src?.channel === "whatsapp" && src.sender) {
+      const text = draft.body.replace(/^Dear Sir,\n\n/, "").replace(/\n\nThanks & Regards,$/, "");
+      actionId = (await proposeAction("send_whatsapp", cs.id, { to: src.sender, text }, { proposedBy: "W1" })).id;
+    } else {
+      const { data: ppl } = await db.from("people").select("email").eq("project_id", cs.project_id ?? "").not("email", "is", null);
+      actionId = (await proposeAction("send_clarification", cs.id, { to: (ppl ?? []).map(p => p.email as string), ...draft }, { proposedBy: "W1" })).id;
+    }
   }
   await logStep({ caseId: cs.id, workflow: "W1", step: "BOQ check", input: { document: doc.filename, sheet: parsed.sheet },
     output: { version: ver.version, lines: parsed.lines.length, errors: findings.filter(f => f.severity === "error").length, warnings: findings.filter(f => f.severity === "warn").length, clarification_action: actionId },

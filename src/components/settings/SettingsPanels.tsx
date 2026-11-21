@@ -86,3 +86,26 @@ export function PolicyPanel() {
     </>
   );
 }
+
+/** WhatsApp link state, from B's bridge. The bridge token stays on the server. */
+export async function WhatsAppPanel() {
+  const { health, status } = await import("@/channels/whatsapp/bridge");
+  const { knownNumbers } = await import("@/channels/whatsapp/numbers");
+  const configured = !!process.env.WHATSAPP_BRIDGE_TOKEN;
+  const db = admin();
+  const [h, st, nums, { data: conn }, { data: lastMsg }] = await Promise.all([
+    configured ? health() : Promise.resolve(null), configured ? status() : Promise.resolve(null), knownNumbers(),
+    db.from("agent_steps").select("output, finished_at").eq("workflow", "whatsapp").eq("step", "connection").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    db.from("messages").select("created_at").eq("channel", "whatsapp").eq("direction", "in").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!configured) return <p>Not set up. Set <code>WHATSAPP_BRIDGE_TOKEN</code>, <code>WHATSAPP_FORWARD_TOKEN</code> and <code>WHATSAPP_BRIDGE_URL</code> in <code>.env</code>, then start <code>services/whatsapp</code> (<code>npm run up</code>).</p>;
+  return (
+    <div>
+      <p>Bridge: <b>{h?.ok ? "reachable" : `not reachable${h?.error ? ` (${h.error})` : ""}`}</b>{h?.ok ? ` · Evolution: ${h.evolution ? "up" : "down"}` : ""}</p>
+      <p>Phone link: <b>{st?.error ? `unknown (${st.error})` : st?.state ?? "unknown"}</b>{st?.owner ? ` · number ${st.owner}` : ""}. To link or re-link a phone, run <code>npm run wa -- link</code> in <code>services/whatsapp</code>, or open its link page.</p>
+      <p>Allow-listed numbers: <b>{new Set(nums.map(n => n.number)).size}</b> ({nums.filter(n => n.who === "person").length} site, {nums.filter(n => n.who === "vendor").length} vendor, {nums.filter(n => n.who === "env").length} from <code>WHATSAPP_ALLOW_NUMBERS</code>). Messages from other numbers are dropped and not stored.</p>
+      <p>Last inbound message: {dt(lastMsg?.created_at)} · Last link change: {conn ? `${(conn.output as any)?.state} at ${dt(conn.finished_at)}` : "none seen"}</p>
+      <p style={{ opacity: 0.7 }}>Voice notes are stored but not transcribed yet. RFQs go by email, not WhatsApp.</p>
+    </div>
+  );
+}

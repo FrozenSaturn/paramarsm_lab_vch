@@ -134,3 +134,22 @@ export async function seedPastCases(db: pg.Client, projects: Record<string, stri
       await upsert(db, "rfq_recipients", { rfq_id: rfq, vendor_id: vendors[slug] }, { email: vendorEmail(slug), sent_at: sent, status: "quoted" });
   }
 }
+
+/** Phone numbers for the WhatsApp allow-list. Digits only, with the country code.
+ *  SEED_PEOPLE_PHONES="Arijit Dey:919800000001"  SEED_VENDOR_PHONES="bajrang:919800000002,shyama:919800000003" */
+export async function seedPhones(db: pg.Client) {
+  let n = 0;
+  for (const pair of (process.env.SEED_PEOPLE_PHONES ?? "").split(",").map(s => s.trim()).filter(Boolean)) {
+    const [name, phone] = pair.split(":");
+    const r = await db.query(`update people set phone = $1 where name = $2`, [phone.replace(/\D/g, ""), name.trim()]);
+    n += r.rowCount ?? 0;
+  }
+  for (const pair of (process.env.SEED_VENDOR_PHONES ?? "").split(",").map(s => s.trim()).filter(Boolean)) {
+    const [slug, phone] = pair.split(":");
+    const v = QUOTING.find(q => q.slug === slug.trim());
+    if (!v) { console.warn(`  ! unknown vendor slug "${slug}"`); continue; }
+    const r = await db.query(`update vendor_contacts set phone = $1 where vendor_id = (select id from vendors where name = $2)`, [phone.replace(/\D/g, ""), v.name]);
+    n += r.rowCount ?? 0;
+  }
+  return n;
+}
