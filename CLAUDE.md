@@ -106,16 +106,29 @@ This list is the state of `main`.
   - `combine()` in `judge.ts` joins the two answers. A line is auto-matched only when the rules say `auto`, Claude picks the same code with a confidence of 0.8 or more, and Claude does not say that the site code means something else. In all other cases the line goes to review, with both reasons and the Claude choice shown first. If the model call fails, the rule answer stays and a warning is added.
   - Set `CODE_JUDGE=rules` to run the rules only. The model judge also needs `ANTHROPIC_API_KEY`.
   - Each model call writes an `agent_steps` row with the model, the prompt version and the token counts.
+- **Tender preparation (W3).** Code is in `src/tender/`.
+  - `shortlist.ts` reads the work category from the item codes. It lists vendors in that category. A stated category ranks above a guessed one. Past replies add weight. It warns when fewer than 3 vendors have a contact email.
+  - `similar.ts` is the duplicate-tender alert. It compares shared item codes, quantities within 20%, line wording and project with other cases that have an RFQ. It warns and never blocks.
+  - `pack.ts` builds the tender pack: an Excel sheet with Vinayak's lines and quantities, the rate column empty, and the six terms. It also builds the RFQ mail. The subject has `[VIN-RFQ-####]`.
+  - `prepare.ts` (`prepareTender`) needs an accepted BOQ with a code on every line. It creates the `rfqs` row (next number `RFQ-0032`, due date +7 days unless you set one), the recipients, a real Gmail draft per vendor (with the pack attached), and one `send_email` action per vendor. It sends nothing. A second call returns the open RFQ.
+  - `batch.ts` approves all drafts of one RFQ in one call. It needs the `contracts_engineer` or `admin` role. Each mail is still its own action with its own receipt. It emits `rfq.approved` only when the RFQ changes from draft to sent.
+  - Page: `/cases/[id]/tender`. The Inngest function `w3-tender-prep` starts on `codes.confirmed`.
+- **Dispatch and chase (W4).** `chase.ts` plans one reminder per silent vendor and the due-date event. The Inngest function `w4-dispatch-chase` starts on `rfq.approved`. It waits `REMINDER_AFTER_MINUTES` (default 72 hours), proposes reminders (`send_reminder`, a person approves each), waits for the due date, then emits `rfq.due_date_passed`. It needs the Inngest dev server to run the waits.
+- **Mail handler.** `send_email`, `send_clarification` and `send_reminder` use one handler. Record ids and attachments come from the proposed payload only. Attachments are Storage paths. `MAIL_DRY_RUN=true` runs everything except the Gmail call. Use it for tests and demos.
+- **Triage (W0).** Code is in `src/triage/`. Claude (`TRIAGE_MODEL`, default `claude-haiku-5-5`) labels each message: requirement, quote, vendor question, approval reply or noise. The poller emits `message.received` for mail that no RFQ rule claimed.
+  - A case opens on its own only when the sender is verified (`messages.sender_verified`), is a known person in `people`, and the label is a requirement with a confidence of 0.8 or more. A BOQ sheet on that mail is read at once.
+  - A reply in a known thread joins the case only from a verified sender who is a known participant. It never starts a BOQ check by itself.
+  - A label from a rule (`vendor_reply`, `unverified_reply`) is never overwritten.
+  - In all other cases the mail waits in the Inbox. The buttons "Sort it" and "Open case from this mail" are for people.
+- **ERP import sheet.** `src/erp/import-sheet.ts` builds the sheet. The action `erp_import_sheet` writes it to Storage. It never writes to Farvision. The column layout is a placeholder until the client gives the Farvision template. The codes page has the request and the download link.
+- **Settings and "view as".** `src/components/settings/SettingsPanels.tsx` shows the Gmail status, a poll button, the users, the approval policy and the model settings. An admin can use "view as" to show another role's screens. It changes what pages and server actions allow in the app. It adds no rights, and the executor checks the stored role.
+- **Case workspace.** `src/components/case/a/CasePanels.tsx` shows the conversation, the pending actions (approve or reject) and the agent activity. `LiveRefresh.tsx` refreshes the page when the case gets a new step, action or message (Supabase Realtime).
 - **Embeddings.** `src/lib/embeddings.ts` runs `multilingual-e5-small` on this machine. It gives 384 dimensions.
 - **RFQ terms.** `src/lib/rfq-terms.ts` holds the six standard terms.
 
 ## Not built yet (Person A)
 
-- The Gmail poller, the reply matching and the quoted-chain split.
-- Triage (W0), the BOQ check (W1), item-code mapping (W2), tender preparation (W3), dispatch and chase (W4).
 - WhatsApp through Evolution API, and Sarvam speech and translation.
-- The ERP import sheet, the hygiene report and the "view as" switch.
-- `emit()` only writes to the `events` table. It does not send events to Inngest yet.
 
 ## Decisions
 
@@ -129,7 +142,7 @@ This list is the state of `main`.
 - Use TypeScript 5. Next.js 15 does not support TypeScript 7. With TypeScript 7 the build ignores the `@/` paths.
 - Do not use the `googleapis` package. Its types use too much memory in the Next.js build. Use `@googleapis/gmail` and `google-auth-library`.
 - Add `http://localhost:3000/auth/callback` to the redirect URLs in the Supabase dashboard (Authentication, URL Configuration).
-- The Gmail send path is not tested against a real mailbox yet.
+- Real RFQs have not been sent. Tests used `MAIL_DRY_RUN`. A Gmail draft with the attachment was created and deleted in a real mailbox. The batch send, the reminder and the due-date event have not run with Inngest.
 - `src/llm/` is old code from an earlier project. It imports files that do not exist. Rewrite it to the interface in `PLAN.md` section 3.
 - The migrations passed on Postgres 14 with a stand-in `auth` schema. They did not run on Supabase with pgvector. The first `supabase start` and `npm run db:reset` is the real test.
 - Writing embeddings to `item_codes` is not tested.
@@ -139,6 +152,8 @@ This list is the state of `main`.
 
 ## Git
 
+- Stage only your own files with `git add <file>`. Do not use `git add -A` or `git add .`. The working tree can hold uncommitted work of other people, for example the design files (`globals.css`, `src/components/shell/`, `src/components/ui.tsx`). If a file holds your change and their change, stage only your part.
+- A committed page must not import an uncommitted file. Check the staged state alone before you push.
 - Name branches `a/<topic>` and `b/<topic>`.
 - Open a small PR into `main`. Use merge commits.
 - End each commit message with the attribution lines that Claude Code gives.
