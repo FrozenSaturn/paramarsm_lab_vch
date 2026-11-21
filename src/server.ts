@@ -14,7 +14,7 @@ const safeEq = (a: string, b: string) => {
 };
 
 app.post("/webhook", async (req, reply) => {
-  const token = String((req.query as any)?.token ?? "");
+  const token = String(req.headers["x-webhook-token"] ?? "");
   if (!safeEq(token, cfg.webhookSecret)) return reply.code(401).send();
   const m = parseWebhook(req.body);
   reply.send({ ok: true }); // ack fast; Evolution retries on slow responses
