@@ -2,3 +2,4 @@
 import "./handlers/a/dev";
 import "./handlers/a/send-email";
 import "./handlers/b/notify-hod";
+import "./handlers/b/performance-record";

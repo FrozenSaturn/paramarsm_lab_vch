@@ -24,8 +24,17 @@ model doc_chunks {
   page        Int?
   content     String
   embedding   Unsupported("vector(384)")?
+  // Stage 5 (B): hybrid search. The tsvector column `tsv` and its GIN index are hand-written (Prisma cannot describe a generated tsvector).
+  chunk_index  Int       @default(0)
+  source_type  String    @default("document") // document|message (CHECK in raw SQL)
+  vendor_id    String?   @db.Uuid
+  language     String?
+  content_hash String?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
   @@index([case_id])
   @@index([document_id])
+  @@index([message_id])
+  @@index([vendor_id])
 }
 
 model vendor_performance {
@@ -41,6 +50,10 @@ model vendor_performance {
   confirmed_by      String?   @db.Uuid
   is_demo           Boolean?  @default(true)
   created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  // Stage 5 (B): where the rating came from. A memory becomes a performance_record action; approval writes this row.
+  action_id         String?   @db.Uuid
+  source            String?   // demo|confirmed|import
+  source_memory_id  String?
   @@index([vendor_id])
 }
 
@@ -50,7 +63,16 @@ model memory_refs {
   entity     String
   message_id String?   @db.Uuid
   created_at DateTime? @default(now()) @db.Timestamptz(6)
+  // Stage 5 (B): a local copy of what mem0 holds, so the panel can show and delete it and getContext works when mem0 is down.
+  text       String?
+  vendor_id  String?   @db.Uuid
+  case_id    String?   @db.Uuid
+  is_demo    Boolean   @default(false)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.Uuid
+  @@unique([mem0_id, entity])
   @@index([entity])
+  @@index([vendor_id])
 }
 
 model quotes {
