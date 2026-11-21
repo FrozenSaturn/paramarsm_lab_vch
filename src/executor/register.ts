@@ -2,3 +2,5 @@
 import "./handlers/a/send-email";
 import "./handlers/a/send-whatsapp";
 import "./handlers/a/erp-sheet";
+import "./handlers/b/notify-hod";
+import "./handlers/b/performance-record";
